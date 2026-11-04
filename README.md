@@ -32,15 +32,20 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
 
 ## Screenshots
 
+**The popup**
+
+<p align="center">
+  <img width="395" alt="Clipdeck clipboard popup" src="https://github.com/user-attachments/assets/6685488b-b087-4e10-8f24-b0df47ffb149" />
+  &nbsp;
+  <img width="399" alt="Clipdeck clipboard popup" src="https://github.com/user-attachments/assets/63ec3dbe-9d3b-471f-bfb4-f1f9fdcf2951" />
+</p>
+
+**The settings app**, light and dark
+
 <p align="center">
   <img src="docs/screenshots/app-light.png" width="380" alt="Clipdeck settings app, light theme">
   &nbsp;
   <img src="docs/screenshots/app-dark.png" width="380" alt="Clipdeck settings app, dark theme">
-</p>
-<p align="center">
-  <img width="395" height="205" alt="image" src="https://github.com/user-attachments/assets/6685488b-b087-4e10-8f24-b0df47ffb149" />
-  &nbsp;
-  <img width="399" height="129" alt="image" src="https://github.com/user-attachments/assets/63ec3dbe-9d3b-471f-bfb4-f1f9fdcf2951" />
 </p>
 
 
@@ -197,8 +202,9 @@ Clipdeck runs as a GNOME Shell extension instead. Inside the shell it can listen
 ## Development
 
 ```text
-extension/   GNOME Shell extension: extension.js, prefs.js, settingsUi.js (shared
-             settings widgets), stylesheet.css, metadata.json, schemas/
+extension/   GNOME Shell extension: extension.js, prefs.js, stylesheet.css,
+             metadata.json, schemas/, plus modules shared with the app:
+             settingsUi.js (settings widgets) and accent.js (accent colors)
 app/         Settings app (GJS + GTK 4 + libadwaita) and its launcher
 data/        Desktop entry, AppStream metadata, icons
 debian/      Source package for Launchpad PPAs (dpkg-buildpackage / debuild)
@@ -231,7 +237,7 @@ dbus-run-session -- gnome-shell --nested --wayland
 ### Building the `.deb` package
 
 ```bash
-make deb MAINTAINER="Your Name <you@example.com>"
+make deb
 ```
 
 The package is written to `dist/clipdeck_<version>_all.deb`. It installs the extension system-wide in `/usr/share/gnome-shell/extensions`, the settings schema in `/usr/share/glib-2.0/schemas`, and the app in `/usr/share/clipdeck`, with a `clipdeck` launcher and a desktop entry.
@@ -240,21 +246,9 @@ The package is written to `dist/clipdeck_<version>_all.deb`. It installs the ext
 
 Step-by-step guides for extensions.gnome.org and a Launchpad PPA are in [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
-## Roadmap
+## Project status
 
-- [x] Text history, popup, paste into the focused app
-- [x] Image and screenshot support
-- [x] Mouse support, click outside to close
-- [x] Light and dark themes, accent colors, reduced motion
-- [x] Settings app, Extensions-app preferences and `.deb` / PPA packaging
-- [ ] Search and pinned items
-- [ ] Save history to disk across sessions
-- [ ] Exclude apps (for example password managers)
-- [ ] Publish on extensions.gnome.org and in a PPA (see [docs/PUBLISHING.md](docs/PUBLISHING.md))
-
-## Contributing
-
-Bug reports, ideas and pull requests are welcome. Please open an [issue](https://github.com/divasatriaa/clipdeck/issues) first for larger changes. If Clipdeck is useful to you, consider giving the project a ⭐.
+Clipdeck is complete: it does what it set out to do, and no new features are planned. Bug reports are still welcome in the [issue tracker](https://github.com/divasatriaa/clipdeck/issues). If Clipdeck is useful to you, consider giving the project a ⭐.
 
 ## License
 

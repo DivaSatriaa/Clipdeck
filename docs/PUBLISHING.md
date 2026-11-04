@@ -80,7 +80,7 @@ Launchpad does not accept ready-made `.deb` files. You upload a **signed source 
 
 ### Set the maintainer
 
-Launchpad rejects uploads whose signature does not match the changelog. In both `debian/control` (`Maintainer:`) and `debian/changelog` (the line starting with ` -- `), replace `divasatriaa <divasatriaa@users.noreply.github.com>` with the name and email of your GPG key.
+The maintainer is `Diva Satria <divasatria884@gmail.com>` in `debian/control` (`Maintainer:`) and `debian/changelog` (the line starting with ` -- `). `debuild` signs with the GPG key whose user ID matches the changelog line, so your key must use exactly this name and email. If someone else uploads, change both lines to their own GPG identity first.
 
 ### Build and upload (Ubuntu 24.04 "noble")
 
