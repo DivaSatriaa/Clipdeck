@@ -89,3 +89,17 @@
   font-size: 8.5pt;
   color: rgba(0, 0, 0, 0.5);
 }
+
+.clipdeck-item-image {
+  border-radius: 6px;
+  background-color: rgba(0, 0, 0, 0.04);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.clipdeck-item-caption {
+  padding-top: 6px;
+  font-size: 8.5pt;
+  color: rgba(0, 0, 0, 0.55);
+}

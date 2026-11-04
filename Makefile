@@ -1,4 +1,4 @@
-UUID := clipdeck@sidrusgemink.github.io
+UUID := clipdeck@divasatriaa.github.io
 DIST := dist
 ZIP  := $(DIST)/$(UUID).shell-extension.zip
 
