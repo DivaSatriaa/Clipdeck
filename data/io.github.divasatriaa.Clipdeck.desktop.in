@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Clipdeck
+GenericName=Clipboard History
+Comment=Windows-style clipboard history for GNOME
+Exec=@BINDIR@/clipdeck
+Icon=io.github.divasatriaa.Clipdeck
+Terminal=false
+Categories=GTK;GNOME;Utility;
+Keywords=clipboard;history;paste;copy;screenshot;
+StartupNotify=true
+DBusActivatable=false

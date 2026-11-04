@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.divasatriaa.Clipdeck</id>
+  <name>Clipdeck</name>
+  <summary>Windows-style clipboard history for GNOME</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <description>
+    <p>
+      Clipdeck keeps a history of everything you copy, including screenshots,
+      and lets you paste any of it with a single shortcut. Press Super+V, pick
+      an item, and it is pasted straight into the field you were typing in.
+    </p>
+    <ul>
+      <li>Text and image history, including PrtScr screenshots</li>
+      <li>Popup opens at your text cursor or over the active window</li>
+      <li>Mouse and keyboard friendly</li>
+      <li>Light and dark themes, optional reduced motion</li>
+      <li>Customisable shortcut with conflict detection</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.divasatriaa.Clipdeck.desktop</launchable>
+  <url type="homepage">https://github.com/divasatriaa/clipdeck</url>
+  <url type="bugtracker">https://github.com/divasatriaa/clipdeck/issues</url>
+  <developer id="io.github.divasatriaa">
+    <name>divasatriaa</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.2.0" date="2026-11-04"/>
+  </releases>
+</component>

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Launcher for the Clipdeck settings app.
+exec gjs -m "@APPDIR@/main.js" "$@"

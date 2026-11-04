@@ -1,4 +1,4 @@
 dist/
-schemas/gschemas.compiled
+extension/schemas/gschemas.compiled
 *.zip
 node_modules/

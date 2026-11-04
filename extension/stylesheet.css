@@ -1,0 +1,174 @@
+/* Clipdeck — clipboard history popup.
+ *
+ * Light theme is the default; `.clipdeck-dark` on the popup switches to the
+ * dark palette. Accent colours come from the Clipdeck logo.
+ */
+
+/* ---------- Light (default) ---------- */
+
+.clipdeck-popup {
+  width: 380px;
+  padding: 12px;
+  border-radius: 14px;
+  background-color: rgba(246, 243, 249, 0.98);
+  border: 1px solid rgba(47, 13, 54, 0.10);
+  box-shadow: 0 10px 32px rgba(20, 0, 30, 0.30);
+  color: #1d1621;
+}
+
+.clipdeck-header {
+  padding: 2px 4px 10px 4px;
+  spacing: 8px;
+}
+
+.clipdeck-title {
+  font-size: 11pt;
+  font-weight: 600;
+  color: #1d1621;
+}
+
+.clipdeck-clear-button {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 9.5pt;
+  color: #1d1621;
+  background-color: #ffffff;
+  border: 1px solid rgba(47, 13, 54, 0.12);
+}
+
+.clipdeck-clear-button:hover {
+  background-color: #f6f0f9;
+}
+
+.clipdeck-clear-button:active {
+  background-color: #ece2f2;
+}
+
+.clipdeck-clear-button:focus {
+  border: 1px solid #71388a;
+}
+
+.clipdeck-scroll {
+  max-height: 440px;
+}
+
+.clipdeck-list {
+  spacing: 8px;
+  padding: 2px;
+}
+
+.clipdeck-item {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background-color: #ffffff;
+  border: 1px solid rgba(47, 13, 54, 0.07);
+  box-shadow: 0 1px 2px rgba(20, 0, 30, 0.06);
+}
+
+.clipdeck-item:hover {
+  background-color: #faf6fc;
+  border: 1px solid rgba(113, 56, 138, 0.25);
+}
+
+.clipdeck-item:active {
+  background-color: #f1e8f5;
+}
+
+.clipdeck-item:focus {
+  border: 2px solid #71388a;
+  padding: 11px 13px;
+}
+
+.clipdeck-item-text {
+  font-size: 10pt;
+  color: #1d1621;
+}
+
+.clipdeck-item-image {
+  border-radius: 6px;
+  background-color: rgba(47, 13, 54, 0.05);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.clipdeck-item-caption {
+  padding-top: 6px;
+  font-size: 8.5pt;
+  color: rgba(29, 22, 33, 0.55);
+}
+
+.clipdeck-empty {
+  padding: 36px 8px;
+  font-size: 10pt;
+  color: rgba(29, 22, 33, 0.55);
+  text-align: center;
+}
+
+.clipdeck-footer {
+  padding: 10px 4px 0 4px;
+  font-size: 8.5pt;
+  color: rgba(29, 22, 33, 0.50);
+}
+
+/* ---------- Dark ---------- */
+
+.clipdeck-popup.clipdeck-dark {
+  background-color: rgba(32, 24, 37, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+  color: #f2ecf5;
+}
+
+.clipdeck-dark .clipdeck-title,
+.clipdeck-dark .clipdeck-item-text {
+  color: #f2ecf5;
+}
+
+.clipdeck-dark .clipdeck-clear-button {
+  color: #f2ecf5;
+  background-color: #2f2536;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.clipdeck-dark .clipdeck-clear-button:hover {
+  background-color: #3a2e42;
+}
+
+.clipdeck-dark .clipdeck-clear-button:active {
+  background-color: #45374f;
+}
+
+.clipdeck-dark .clipdeck-clear-button:focus {
+  border: 1px solid #c38fd6;
+}
+
+.clipdeck-dark .clipdeck-item {
+  background-color: #2b2232;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
+}
+
+.clipdeck-dark .clipdeck-item:hover {
+  background-color: #34293c;
+  border: 1px solid rgba(195, 143, 214, 0.30);
+}
+
+.clipdeck-dark .clipdeck-item:active {
+  background-color: #3d3047;
+}
+
+.clipdeck-dark .clipdeck-item:focus {
+  border: 2px solid #c38fd6;
+  padding: 11px 13px;
+}
+
+.clipdeck-dark .clipdeck-item-image {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.clipdeck-dark .clipdeck-item-caption,
+.clipdeck-dark .clipdeck-empty,
+.clipdeck-dark .clipdeck-footer {
+  color: rgba(242, 236, 245, 0.55);
+}
