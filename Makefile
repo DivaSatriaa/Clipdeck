@@ -1,7 +1,7 @@
 UUID       := clipdeck@divasatriaa.github.io
 APP_ID     := io.github.divasatriaa.Clipdeck
 VERSION    := $(shell sed -n 's/.*"version-name": *"\([^"]*\)".*/\1/p' extension/metadata.json)
-MAINTAINER ?= DivaSatria <divasatria884@gmail.com>
+MAINTAINER ?= Diva Satria <divasatria884@gmail.com>
 
 DIST       := dist
 ZIP        := $(DIST)/$(UUID).shell-extension.zip

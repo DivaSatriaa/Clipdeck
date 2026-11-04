@@ -1,7 +1,7 @@
 Source: clipdeck
 Section: gnome
 Priority: optional
-Maintainer: DivaSatria <divasatria884@gmail.com>
+Maintainer: Diva Satria <divasatria884@gmail.com>
 Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.6.2
 Homepage: https://github.com/divasatriaa/clipdeck
