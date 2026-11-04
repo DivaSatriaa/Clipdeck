@@ -21,7 +21,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as AnimationUtils from 'resource:///org/gnome/shell/misc/animationUtils.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {CLIPDECK_ACCENT, popupAccentCss, resolveAccent} from './accent.js';
+import {popupAccentCss, resolveAccent} from './accent.js';
 
 const MAX_TEXT_LENGTH = 100_000;
 const PREVIEW_MAX_CHARS = 160;
@@ -851,7 +851,9 @@ export default class ClipdeckExtension extends Extension {
         if (hex === this._accentHex && !themeChanged)
             return;
 
-        // stylesheet.css already uses the Clipdeck purple.
+        // Always load the generated stylesheet, even for the default purple,
+        // so every colour is derived the same way (stylesheet.css is only the
+        // fallback if loading fails).
         const theme = this._themeContext.get_theme();
         const loaded = this._accentFile &&
             theme.get_custom_stylesheets().some(f => f.equal(this._accentFile));
@@ -860,8 +862,6 @@ export default class ClipdeckExtension extends Extension {
 
         this._unloadAccent();
         this._accentHex = hex;
-        if (hex === CLIPDECK_ACCENT)
-            return;
 
         const file = this._accentDir.get_child(`accent-${hex.slice(1)}.css`);
         try {

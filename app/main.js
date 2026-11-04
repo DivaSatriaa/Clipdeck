@@ -22,6 +22,10 @@ const ISSUES_URL = `${REPO_URL}/issues`;
 
 const APP_DIR = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
 
+// The process is "gjs"; name it after the app so GNOME matches the window
+// to io.github.divasatriaa.Clipdeck.desktop (dock and window icons).
+GLib.set_prgname(APP_ID);
+
 // Modules shared with the extension's prefs.js. Installed next to this
 // file; in a source checkout they live in ../extension/.
 function sharedModule(name) {

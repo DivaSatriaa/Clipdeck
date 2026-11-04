@@ -73,39 +73,75 @@ export function describeAccent(value) {
     return preset ? preset.name : `Custom ${value.toUpperCase()}`;
 }
 
+/** Mix `base` with `tint`: amount 0 gives base, 1 gives tint. */
+export function mix(base, tint, amount) {
+    const a = toRgb(base), b = toRgb(tint);
+    return toHex(a.map((c, i) => c + (b[i] - c) * amount));
+}
+
 /**
- * Popup CSS for an accent colour. The selectors carry .clipdeck-accent so
- * they outrank stylesheet.css (and the dark variants outrank the light).
+ * Popup CSS for an accent colour: the focus ring and hover states use the
+ * colour itself, and the popup, card and button backgrounds get a light
+ * tint of it, so the whole popup follows the chosen colour.
+ *
+ * The selectors carry .clipdeck-accent so they outrank stylesheet.css (and
+ * the dark variants outrank the light ones).
  */
 export function popupAccentCss(hex) {
-    const light = hex;
-    const dark = shade(hex, 0.35);
+    const L = '.clipdeck-popup.clipdeck-accent';
+    const D = '.clipdeck-popup.clipdeck-dark.clipdeck-accent';
+    const darkAccent = shade(hex, 0.35);
     return `
-.clipdeck-popup.clipdeck-accent .clipdeck-item:hover {
-  border: 1px solid ${rgba(light, 0.30)};
+${L} {
+  background-color: ${rgba(mix('#f7f7f8', hex, 0.06), 0.98)};
+  border: 1px solid ${rgba(hex, 0.12)};
 }
-.clipdeck-popup.clipdeck-accent .clipdeck-item:active {
-  background-color: ${rgba(light, 0.10)};
+${L} .clipdeck-clear-button {
+  background-color: #ffffff;
+  border: 1px solid ${rgba(hex, 0.14)};
 }
-.clipdeck-popup.clipdeck-accent .clipdeck-item:focus {
-  border: 2px solid ${light};
+${L} .clipdeck-clear-button:hover { background-color: ${mix('#ffffff', hex, 0.07)}; }
+${L} .clipdeck-clear-button:active { background-color: ${mix('#ffffff', hex, 0.14)}; }
+${L} .clipdeck-clear-button:focus { border: 1px solid ${hex}; }
+${L} .clipdeck-item {
+  background-color: #ffffff;
+  border: 1px solid ${rgba(hex, 0.08)};
+}
+${L} .clipdeck-item:hover {
+  background-color: ${mix('#ffffff', hex, 0.04)};
+  border: 1px solid ${rgba(hex, 0.30)};
+}
+${L} .clipdeck-item:active { background-color: ${mix('#ffffff', hex, 0.10)}; }
+${L} .clipdeck-item:focus {
+  border: 2px solid ${hex};
   padding: 11px 13px;
 }
-.clipdeck-popup.clipdeck-accent .clipdeck-clear-button:focus {
-  border: 1px solid ${light};
+${L} .clipdeck-item-image { background-color: ${rgba(hex, 0.06)}; }
+
+${D} {
+  background-color: ${rgba(mix('#1e1e20', hex, 0.10), 0.98)};
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
-.clipdeck-popup.clipdeck-dark.clipdeck-accent .clipdeck-item:hover {
-  border: 1px solid ${rgba(dark, 0.30)};
+${D} .clipdeck-clear-button {
+  background-color: ${mix('#2c2c2e', hex, 0.10)};
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
-.clipdeck-popup.clipdeck-dark.clipdeck-accent .clipdeck-item:active {
-  background-color: ${rgba(dark, 0.14)};
+${D} .clipdeck-clear-button:hover { background-color: ${mix('#353537', hex, 0.14)}; }
+${D} .clipdeck-clear-button:active { background-color: ${mix('#3e3e40', hex, 0.18)}; }
+${D} .clipdeck-clear-button:focus { border: 1px solid ${darkAccent}; }
+${D} .clipdeck-item {
+  background-color: ${mix('#28282a', hex, 0.10)};
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
-.clipdeck-popup.clipdeck-dark.clipdeck-accent .clipdeck-item:focus {
-  border: 2px solid ${dark};
+${D} .clipdeck-item:hover {
+  background-color: ${mix('#303032', hex, 0.14)};
+  border: 1px solid ${rgba(darkAccent, 0.30)};
+}
+${D} .clipdeck-item:active { background-color: ${mix('#38383a', hex, 0.18)}; }
+${D} .clipdeck-item:focus {
+  border: 2px solid ${darkAccent};
   padding: 11px 13px;
 }
-.clipdeck-popup.clipdeck-dark.clipdeck-accent .clipdeck-clear-button:focus {
-  border: 1px solid ${dark};
-}
+${D} .clipdeck-item-image { background-color: ${rgba(darkAccent, 0.08)}; }
 `;
 }
