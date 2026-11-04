@@ -293,9 +293,6 @@ class ClipboardPopup {
         const fromAbove = this._placeAt(anchor);
         this._focusIndex(0);
 
-        console.log(`[Clipdeck] popup opened at ${this._box.x},${this._box.y} ` +
-            `(anchor: ${anchor.source}), items=${this._buttons.length}`);
-
         if (!animate)
             return;
 
@@ -589,7 +586,6 @@ export default class ClipdeckExtension extends Extension {
             Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW | Shell.ActionMode.POPUP,
             () => {
-                console.log('[Clipdeck] shortcut pressed');
                 try {
                     this._popup.toggle();
                 } catch (e) {
@@ -597,8 +593,6 @@ export default class ClipdeckExtension extends Extension {
                 }
             });
 
-        console.log(`[Clipdeck] enabled, shortcut=${JSON.stringify(
-            this._settings.get_strv('toggle-popup'))}, action=${action}`);
         if (!action)
             console.warn('[Clipdeck] shortcut could not be registered (already taken?)');
 

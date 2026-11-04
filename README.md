@@ -94,7 +94,7 @@ History is kept in memory and cleared when you log out. Images are stored tempor
 
 ## Settings app
 
-The **Clipdeck** app in your app grid controls the extension:
+The **Clipdeck** app in your app grid controls the extension. The same settings (except the on/off switch) are also available from the ⚙ button next to Clipdeck in the **Extensions** app.
 
 | Setting | What it does |
 | --- | --- |
@@ -171,10 +171,13 @@ Clipdeck runs as a GNOME Shell extension instead. Inside the shell it can listen
 ## Development
 
 ```text
-extension/   GNOME Shell extension (extension.js, stylesheet.css, metadata.json, schemas/)
+extension/   GNOME Shell extension: extension.js, prefs.js, settingsUi.js (shared
+             settings widgets), stylesheet.css, metadata.json, schemas/
 app/         Settings app (GJS + GTK 4 + libadwaita) and its launcher
 data/        Desktop entry, AppStream metadata, icons
-packaging/   Debian package metadata
+debian/      Source package for Launchpad PPAs (dpkg-buildpackage / debuild)
+packaging/   Control file for the quick `make deb` build
+docs/        Screenshots and the publishing guide
 assets/      Logo
 ```
 
@@ -183,8 +186,9 @@ assets/      Logo
 | `make install` | Install the extension and the app for the current user |
 | `make uninstall` | Remove both again |
 | `make run-app` | Run the settings app straight from the source folder |
-| `make pack` | Build the extension zip into `dist/` |
+| `make pack` | Build the extension zip for extensions.gnome.org into `dist/` |
 | `make deb` | Build the `.deb` package into `dist/` |
+| `make ppa-source` | Build a signed source package for a Launchpad PPA |
 | `make enable` / `make disable` | Turn the extension on or off |
 | `make logs` | Follow GNOME Shell logs |
 
@@ -205,6 +209,10 @@ make deb MAINTAINER="Your Name <you@example.com>"
 ```
 
 The package is written to `dist/clipdeck_<version>_all.deb`. It installs the extension system-wide in `/usr/share/gnome-shell/extensions`, the settings schema in `/usr/share/glib-2.0/schemas`, and the app in `/usr/share/clipdeck`, with a `clipdeck` launcher and a desktop entry.
+
+### Publishing
+
+Step-by-step guides for extensions.gnome.org and a Launchpad PPA are in [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ## Roadmap
 
