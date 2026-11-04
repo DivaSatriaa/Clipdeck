@@ -21,7 +21,6 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as AnimationUtils from 'resource:///org/gnome/shell/misc/animationUtils.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const MAX_ITEMS = 50;
 const MAX_TEXT_LENGTH = 100_000;
 const PREVIEW_MAX_CHARS = 160;
 const PREVIEW_MAX_LINES = 3;
@@ -237,15 +236,23 @@ class ClipboardPopup {
         // Click anywhere outside the card closes the popup. (Clutter 45+ no
         // longer sets the event source for button events, so ask the stage
         // which actor was actually hit.)
+        //
+        // Clicks inside the card must PROPAGATE: since GNOME 47, St.Button
+        // uses a click gesture, and an actor that stops the press event
+        // cancels every gesture in the chain, so buttons never emit
+        // "clicked" (this is what broke "Clear all" and clicking items).
         this._backdrop.connect('button-press-event', (actor, event) => {
-            if (global.stage.get_event_actor(event) === actor)
-                this.close();
+            if (global.stage.get_event_actor(event) !== actor)
+                return Clutter.EVENT_PROPAGATE;
+            this.close();
             return Clutter.EVENT_STOP;
         });
         this._backdrop.connect('key-press-event', (_actor, event) =>
             this._onKeyPress(event));
 
         this._box = makeBox({style_class: 'clipdeck-popup', reactive: true}, true);
+        if (this._ext.useDarkTheme)
+            this._box.add_style_class_name('clipdeck-dark');
         this._box.add_child(this._buildHeader());
 
         this._list = makeBox({style_class: 'clipdeck-list', x_expand: true}, true);
@@ -281,12 +288,16 @@ class ClipboardPopup {
             return;
         }
 
-        this._rebuildList(true);
+        const animate = !this._ext.reduceMotion;
+        this._rebuildList(animate);
         const fromAbove = this._placeAt(anchor);
         this._focusIndex(0);
 
         console.log(`[Clipdeck] popup opened at ${this._box.x},${this._box.y} ` +
             `(anchor: ${anchor.source}), items=${this._buttons.length}`);
+
+        if (!animate)
+            return;
 
         // Grow out of the text field: slightly scaled down and shifted towards
         // the anchor, then ease into place.
@@ -324,7 +335,7 @@ class ClipboardPopup {
         this._list = null;
         this._buttons = [];
 
-        if (!animate || !box) {
+        if (!animate || !box || this._ext.reduceMotion) {
             backdrop.destroy();
             return;
         }
@@ -565,6 +576,11 @@ export default class ClipdeckExtension extends Extension {
                     this._onClipboardChanged(source);
             });
 
+        this._interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+        this._settingsChangedIds = [
+            this._settings.connect('changed::history-size', () => this._trimHistory()),
+        ];
+
         this._popup = new ClipboardPopup(this);
 
         const action = Main.wm.addKeybinding(
@@ -593,6 +609,10 @@ export default class ClipdeckExtension extends Extension {
     disable() {
         Main.wm.removeKeybinding('toggle-popup');
 
+        this._settingsChangedIds?.forEach(id => this._settings.disconnect(id));
+        this._settingsChangedIds = null;
+        this._interfaceSettings = null;
+
         this._popup?.close({animate: false});
         this._popup = null;
 
@@ -619,6 +639,17 @@ export default class ClipdeckExtension extends Extension {
 
     get history() {
         return this._history ?? [];
+    }
+
+    get reduceMotion() {
+        return this._settings?.get_boolean('reduce-motion') ?? false;
+    }
+
+    get useDarkTheme() {
+        const theme = this._settings?.get_string('theme') ?? 'system';
+        if (theme !== 'system')
+            return theme === 'dark';
+        return this._interfaceSettings?.get_string('color-scheme') === 'prefer-dark';
     }
 
     clearHistory() {
@@ -683,7 +714,8 @@ export default class ClipdeckExtension extends Extension {
         // clipboard. Anything that also offers text is stored as text.
         const imageMime = pickImageMime(mimeTypes);
         if (imageMime) {
-            this._captureImage(imageMime);
+            if (this._settings.get_boolean('enable-images'))
+                this._captureImage(imageMime);
             return;
         }
 
@@ -750,10 +782,15 @@ export default class ClipdeckExtension extends Extension {
 
         entry.time = Date.now();
         this._history.unshift(entry);
-        while (this._history.length > MAX_ITEMS)
-            this._disposeEntry(this._history.pop());
+        this._trimHistory();
 
         this._popup?.refresh();
+    }
+
+    _trimHistory() {
+        const max = this._settings.get_int('history-size');
+        while (this._history.length > max)
+            this._disposeEntry(this._history.pop());
     }
 
     _disposeEntry(entry) {

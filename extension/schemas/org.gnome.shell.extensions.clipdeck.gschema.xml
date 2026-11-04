@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.clipdeck" path="/org/gnome/shell/extensions/clipdeck/">
+    <key name="toggle-popup" type="as">
+      <default><![CDATA[['<Super>v']]]></default>
+      <summary>Open clipboard history</summary>
+      <description>Keyboard shortcut that opens or closes the clipboard history popup.</description>
+    </key>
+    <key name="theme" type="s">
+      <choices>
+        <choice value="system"/>
+        <choice value="light"/>
+        <choice value="dark"/>
+      </choices>
+      <default>'system'</default>
+      <summary>Popup theme</summary>
+      <description>"system" follows the GNOME light/dark style; "light" and "dark" force one.</description>
+    </key>
+    <key name="reduce-motion" type="b">
+      <default>false</default>
+      <summary>Reduce animations</summary>
+      <description>Open and close the popup without animations.</description>
+    </key>
+    <key name="enable-images" type="b">
+      <default>true</default>
+      <summary>Keep screenshots and images</summary>
+      <description>Store copied images, such as PrtScr screenshots, in the history.</description>
+    </key>
+    <key name="history-size" type="i">
+      <range min="10" max="200"/>
+      <default>50</default>
+      <summary>History size</summary>
+      <description>Maximum number of items kept in the history.</description>
+    </key>
+  </schema>
+</schemalist>
