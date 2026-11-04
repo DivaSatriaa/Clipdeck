@@ -49,15 +49,16 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
 
 ### Option 1: `.deb` package (Ubuntu / Debian)
 
-1. Download `clipdeck_<version>_all.deb` from the [Releases](https://github.com/divasatriaa/clipdeck/releases) page, or [build it yourself](#building-the-deb-package).
-2. Install it with apt, which also pulls in the dependencies:
+Build the package from source, then install it with apt, which also pulls in the dependencies:
 
-   ```bash
-   sudo apt install ./clipdeck_0.2.0_all.deb
-   ```
+```bash
+git clone https://github.com/divasatriaa/clipdeck.git
+cd clipdeck
+make deb
+sudo apt install ./dist/clipdeck_0.2.0_all.deb
+```
 
-3. **Log out and back in.** GNOME Shell only discovers new extensions at login.
-4. Open **Clipdeck** from the app grid and switch on **Enable Clipdeck**.
+Then **log out and back in** (GNOME Shell only discovers new extensions at login), open **Clipdeck** from the app grid and switch on **Enable Clipdeck**.
 
 To remove it:
 
