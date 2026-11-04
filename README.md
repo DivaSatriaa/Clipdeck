@@ -37,7 +37,7 @@ Code that runs inside GNOME Shell can listen to the clipboard through `Meta.Sele
 ## Install from source
 
 ```bash
-git clone https://github.com/SidrusGemink/clipdeck.git
+git clone https://github.com/divasatriaa/clipdeck.git
 cd clipdeck
 make install
 ```

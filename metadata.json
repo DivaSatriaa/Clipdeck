@@ -1,9 +1,9 @@
 {
-  "uuid": "clipdeck@sidrusgemink.github.io",
+  "uuid": "clipdeck@divasatriaa.github.io",
   "name": "Clipdeck",
   "description": "Windows 11-style clipboard history for GNOME. Press Super+V to open your history and paste straight into the focused field.",
   "shell-version": ["45", "46", "47", "48", "49", "50"],
-  "url": "https://github.com/SidrusGemink/clipdeck",
+  "url": "https://github.com/divasatriaa/clipdeck",
   "settings-schema": "org.gnome.shell.extensions.clipdeck",
   "version-name": "0.1.0"
 }
