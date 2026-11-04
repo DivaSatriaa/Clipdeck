@@ -222,7 +222,11 @@ class ClipboardPopup {
 
     _show(anchor) {
         this._grab = Main.pushModal(this._backdrop, {actionMode: Shell.ActionMode.POPUP});
-        if ((this._grab.get_seat_state() & Clutter.GrabState.KEYBOARD) === 0) {
+        // Clutter.Grab.get_seat_state() only exists on GNOME 47+; older
+        // versions have no way to ask, so assume the grab worked.
+        const canCheck = typeof this._grab.get_seat_state === 'function';
+        if (canCheck &&
+            (this._grab.get_seat_state() & Clutter.GrabState.KEYBOARD) === 0) {
             // Another component holds the keyboard; bail out cleanly.
             console.warn('[Clipdeck] could not grab keyboard, popup closed');
             this.close();
