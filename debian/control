@@ -1,0 +1,26 @@
+Source: clipdeck
+Section: gnome
+Priority: optional
+Maintainer: divasatriaa <divasatriaa@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/divasatriaa/clipdeck
+Vcs-Browser: https://github.com/divasatriaa/clipdeck
+Vcs-Git: https://github.com/divasatriaa/clipdeck.git
+Rules-Requires-Root: no
+
+Package: clipdeck
+Architecture: all
+Depends: ${misc:Depends},
+         gnome-shell (>= 45),
+         gjs,
+         gir1.2-gtk-4.0 (>= 4.14),
+         gir1.2-adw-1 (>= 1.5)
+Description: Windows-style clipboard history for GNOME
+ Clipdeck keeps a history of the text and images you copy, including
+ PrtScr screenshots. Press Super+V to open it and click an item to paste it
+ straight into the field you were typing in.
+ .
+ This package contains the GNOME Shell extension and the Clipdeck settings
+ app, which turns the extension on and off and configures its shortcut,
+ theme, animations and screenshot support.

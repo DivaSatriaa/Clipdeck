@@ -1,4 +1,3 @@
-#!/usr/bin/env -S gjs -m
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
 // Clipdeck settings app. Controls the Clipdeck GNOME Shell extension:
@@ -18,11 +17,38 @@ const APP_ID = 'io.github.divasatriaa.Clipdeck';
 const VERSION = '0.2.0';
 const UUID = 'clipdeck@divasatriaa.github.io';
 const SCHEMA_ID = 'org.gnome.shell.extensions.clipdeck';
-const DEFAULT_SHORTCUT = '<Super>v';
 const REPO_URL = 'https://github.com/divasatriaa/clipdeck';
 const ISSUES_URL = `${REPO_URL}/issues`;
 
 const APP_DIR = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
+
+// The process is "gjs"; name it after the app so GNOME matches the window
+// to io.github.divasatriaa.Clipdeck.desktop (dock and window icons).
+GLib.set_prgname(APP_ID);
+
+// Modules shared with the extension's prefs.js. Installed next to this
+// file; in a source checkout they live in ../extension/.
+function sharedModule(name) {
+    return GLib.file_test(GLib.build_filenamev([APP_DIR, name]), GLib.FileTest.EXISTS)
+        ? `./${name}`
+        : `../extension/${name}`;
+}
+
+const {
+    accelLabel,
+    createAppearanceGroup,
+    createClipboardGroup,
+    createShortcutRow,
+    describeConflicts,
+    trySettings,
+} = await import(sharedModule('settingsUi.js'));
+const {resolveAccent, shade} = await import(sharedModule('accent.js'));
+
+// GNOME Shell exports org.gnome.Shell.Extensions on this object path
+// (js/ui/shellDBus.js), not on /org/gnome/Shell/Extensions.
+const SHELL_BUS_NAME = 'org.gnome.Shell';
+const SHELL_OBJECT_PATH = '/org/gnome/Shell';
+const EXTENSIONS_IFACE = 'org.gnome.Shell.Extensions';
 
 // org.gnome.Shell.Extensions extension states (js/misc/extensionUtils.js).
 const ExtensionState = {
@@ -46,121 +72,58 @@ const ExtensionState = {
  * `make install` from source only ships it inside the extension folder,
  * and a source checkout keeps it next to this file.
  */
+// Every key this app reads. A schema missing one of them is left over from
+// an older Clipdeck install.
+const REQUIRED_KEYS = [
+    'toggle-popup', 'theme', 'accent-color', 'reduce-motion', 'enable-images', 'history-size',
+];
+
+/**
+ * Find the Clipdeck settings schema. It can be installed system-wide (the
+ * .deb), inside the per-user extension folder (`make install`) or next to
+ * the sources. When several copies exist, prefer one that has every key:
+ * an outdated copy (for example from an older .deb) would otherwise hide
+ * new settings.
+ *
+ * Returns {settings, outdated}; settings is null when nothing is installed.
+ */
 function loadExtensionSettings() {
     const defaultSource = Gio.SettingsSchemaSource.get_default();
-    const schema = defaultSource?.lookup(SCHEMA_ID, true);
-    if (schema)
-        return new Gio.Settings({settings_schema: schema});
+    const found = [];
 
-    const candidates = [
+    const fromDefault = defaultSource?.lookup(SCHEMA_ID, true);
+    if (fromDefault)
+        found.push({schema: fromDefault, where: 'system schemas'});
+
+    const dirs = [
         GLib.getenv('CLIPDECK_SCHEMA_DIR'),
         GLib.build_filenamev([GLib.get_user_data_dir(), 'gnome-shell', 'extensions', UUID, 'schemas']),
         GLib.build_filenamev(['/usr/share/gnome-shell/extensions', UUID, 'schemas']),
         GLib.build_filenamev([APP_DIR, '..', 'extension', 'schemas']),
     ];
-    for (const dir of candidates) {
+    for (const dir of dirs) {
         if (!dir || !GLib.file_test(GLib.build_filenamev([dir, 'gschemas.compiled']), GLib.FileTest.EXISTS))
             continue;
         try {
             const source = Gio.SettingsSchemaSource.new_from_directory(dir, defaultSource, false);
-            const found = source.lookup(SCHEMA_ID, false);
-            if (found)
-                return new Gio.Settings({settings_schema: found});
+            const schema = source.lookup(SCHEMA_ID, false);
+            if (schema)
+                found.push({schema, where: dir});
         } catch (e) {
             console.warn(`Clipdeck: could not read schemas in ${dir}: ${e.message}`);
         }
     }
-    return null;
-}
 
-/** Gio.Settings for a schema, or null when it is not installed (never abort). */
-function trySettings(schemaId, path = null) {
-    const schema = Gio.SettingsSchemaSource.get_default()?.lookup(schemaId, true);
-    if (!schema)
-        return null;
-    return path
-        ? new Gio.Settings({settings_schema: schema, path})
-        : new Gio.Settings({settings_schema: schema});
-}
+    if (found.length === 0)
+        return {settings: null, outdated: false};
 
-/* ------------------------------------------------------------------ */
-/* Shortcuts                                                           */
-/* ------------------------------------------------------------------ */
-
-function parseAccel(accel) {
-    if (!accel)
-        return null;
-    const [ok, keyval, mods] = Gtk.accelerator_parse(accel);
-    if (!ok || !keyval)
-        return null;
-    return {keyval: Gdk.keyval_to_lower(keyval), mods};
-}
-
-function sameAccel(a, b) {
-    const pa = parseAccel(a), pb = parseAccel(b);
-    return pa !== null && pb !== null && pa.keyval === pb.keyval && pa.mods === pb.mods;
-}
-
-function accelLabel(accel) {
-    const parsed = parseAccel(accel);
-    return parsed ? Gtk.accelerator_get_label(parsed.keyval, parsed.mods) : 'Disabled';
-}
-
-// Places where GNOME keeps global shortcuts that would win over Clipdeck's.
-const SHORTCUT_SCHEMAS = [
-    'org.gnome.shell.keybindings',
-    'org.gnome.desktop.wm.keybindings',
-    'org.gnome.mutter.keybindings',
-    'org.gnome.mutter.wayland.keybindings',
-    'org.gnome.settings-daemon.plugins.media-keys',
-];
-const CUSTOM_SCHEMA = 'org.gnome.settings-daemon.plugins.media-keys.custom-keybinding';
-
-/**
- * Every other GNOME shortcut bound to `accel`. Each conflict knows how to
- * remove the accelerator from itself.
- */
-function findConflicts(accel) {
-    const conflicts = [];
-    if (!parseAccel(accel))
-        return conflicts;
-
-    for (const schemaId of SHORTCUT_SCHEMAS) {
-        const settings = trySettings(schemaId);
-        if (!settings)
-            continue;
-        const schema = settings.settings_schema;
-        for (const key of schema.list_keys()) {
-            const type = schema.get_key(key).get_value_type().dup_string();
-            if (type === 'as') {
-                const values = settings.get_strv(key);
-                if (values.some(v => sameAccel(v, accel))) {
-                    conflicts.push({
-                        label: schema.get_key(key).get_summary() || key,
-                        free: () => settings.set_strv(key, values.filter(v => !sameAccel(v, accel))),
-                    });
-                }
-            } else if (type === 's' && key !== 'custom-keybindings' && sameAccel(settings.get_string(key), accel)) {
-                conflicts.push({
-                    label: schema.get_key(key).get_summary() || key,
-                    free: () => settings.set_string(key, ''),
-                });
-            }
-        }
+    const complete = found.find(({schema}) => REQUIRED_KEYS.every(key => schema.has_key(key)));
+    const chosen = complete ?? found[0];
+    if (!complete) {
+        const missing = REQUIRED_KEYS.filter(key => !chosen.schema.has_key(key));
+        console.warn(`Clipdeck: settings schema in ${chosen.where} is outdated, missing: ${missing.join(', ')}`);
     }
-
-    const mediaKeys = trySettings('org.gnome.settings-daemon.plugins.media-keys');
-    for (const path of mediaKeys?.get_strv('custom-keybindings') ?? []) {
-        const custom = trySettings(CUSTOM_SCHEMA, path);
-        if (!custom || !sameAccel(custom.get_string('binding'), accel))
-            continue;
-        const name = custom.get_string('name') || custom.get_string('command');
-        conflicts.push({
-            label: `Custom shortcut “${name}”`,
-            free: () => custom.set_string('binding', ''),
-        });
-    }
-    return conflicts;
+    return {settings: new Gio.Settings({settings_schema: chosen.schema}), outdated: !complete};
 }
 
 /* ------------------------------------------------------------------ */
@@ -171,14 +134,14 @@ class ShellExtensions {
     constructor(onChanged) {
         this._bus = Gio.DBus.session;
         this._signalId = this._bus.signal_subscribe(
-            'org.gnome.Shell', 'org.gnome.Shell.Extensions', 'ExtensionStateChanged',
-            '/org/gnome/Shell/Extensions', UUID, Gio.DBusSignalFlags.NONE,
+            SHELL_BUS_NAME, EXTENSIONS_IFACE, 'ExtensionStateChanged',
+            SHELL_OBJECT_PATH, UUID, Gio.DBusSignalFlags.NONE,
             () => onChanged());
     }
 
     _call(method, args, replyType) {
-        return this._bus.call_sync('org.gnome.Shell', '/org/gnome/Shell/Extensions',
-            'org.gnome.Shell.Extensions', method, args,
+        return this._bus.call_sync(SHELL_BUS_NAME, SHELL_OBJECT_PATH,
+            EXTENSIONS_IFACE, method, args,
             replyType ? new GLib.VariantType(replyType) : null,
             Gio.DBusCallFlags.NONE, 3000, null);
     }
@@ -192,6 +155,7 @@ class ShellExtensions {
                 return {available: true, state: ExtensionState.UNINSTALLED, error: ''};
             return {available: true, state: info.state, error: info.error ?? ''};
         } catch (e) {
+            console.warn(`Clipdeck: cannot reach GNOME Shell: ${e.message}`);
             return {available: false, state: ExtensionState.UNINSTALLED, error: e.message};
         }
     }
@@ -213,87 +177,12 @@ class ShellExtensions {
 }
 
 /* ------------------------------------------------------------------ */
-/* Shortcut capture dialog                                             */
-/* ------------------------------------------------------------------ */
-
-const ShortcutDialog = GObject.registerClass({
-    Signals: {'shortcut-chosen': {param_types: [GObject.TYPE_STRING]}},
-}, class ShortcutDialog extends Adw.Window {
-    _init(parent) {
-        super._init({
-            modal: true,
-            transient_for: parent,
-            title: 'Set Shortcut',
-            default_width: 420,
-            resizable: false,
-        });
-
-        const status = new Adw.StatusPage({
-            icon_name: 'input-keyboard-symbolic',
-            title: 'Press the new shortcut',
-            description: 'Use at least one modifier, such as Super, Ctrl or Alt.\n' +
-                'Esc cancels · Backspace restores Super+V',
-        });
-        status.add_css_class('compact');
-
-        const toolbar = new Adw.ToolbarView();
-        toolbar.add_top_bar(new Adw.HeaderBar());
-        toolbar.set_content(status);
-        this.set_content(toolbar);
-
-        const keys = new Gtk.EventControllerKey();
-        keys.connect('key-pressed', (_c, keyval, keycode, state) =>
-            this._onKey(keyval, keycode, state));
-        this.add_controller(keys);
-
-        // Let Super+V & co. reach this window instead of GNOME Shell while
-        // the user records a shortcut (GNOME may ask for permission once).
-        this.connect('map', () => {
-            try {
-                this.get_surface()?.inhibit_system_shortcuts(null);
-            } catch {
-                // Not supported on this display server.
-            }
-        });
-        this.connect('unmap', () => {
-            try {
-                this.get_surface()?.restore_system_shortcuts();
-            } catch {
-                // Nothing to restore.
-            }
-        });
-    }
-
-    _onKey(keyval, keycode, state) {
-        const mods = state & Gtk.accelerator_get_default_mod_mask();
-        const key = Gdk.keyval_to_lower(keyval);
-
-        if (mods === 0 && key === Gdk.KEY_Escape) {
-            this.close();
-            return Gdk.EVENT_STOP;
-        }
-        if (mods === 0 && key === Gdk.KEY_BackSpace) {
-            this.emit('shortcut-chosen', DEFAULT_SHORTCUT);
-            this.close();
-            return Gdk.EVENT_STOP;
-        }
-        // Wait for a real key; a lone modifier or a bare letter is not enough.
-        if (mods === 0 || !Gtk.accelerator_valid(key, mods))
-            return Gdk.EVENT_STOP;
-
-        this.emit('shortcut-chosen', Gtk.accelerator_name(key, mods));
-        this.close();
-        return Gdk.EVENT_STOP;
-    }
-});
-
-/* ------------------------------------------------------------------ */
 /* Main window                                                         */
 /* ------------------------------------------------------------------ */
 
 const ClipdeckWindow = GObject.registerClass(
 class ClipdeckWindow extends Adw.ApplicationWindow {
-    _init(app, settings) {
+    _init(app, settings, schemaOutdated = false) {
         super._init({
             application: app,
             title: 'Clipdeck',
@@ -314,6 +203,13 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
         this._banner.connect('button-clicked', () => this._bannerAction?.());
         toolbar.add_top_bar(this._banner);
 
+        // An older Clipdeck install left its settings schema behind.
+        toolbar.add_top_bar(new Adw.Banner({
+            revealed: schemaOutdated,
+            title: 'An older Clipdeck installation is still active, so some settings are ' +
+                'unavailable. Reinstall Clipdeck, then log out and back in.',
+        }));
+
         this._toasts = new Adw.ToastOverlay();
         toolbar.set_content(this._toasts);
         this.set_content(toolbar);
@@ -329,28 +225,37 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
             return;
         }
 
+        // Build each section on its own: one failing section (for example a
+        // GTK API that changed) must not leave the whole window blank.
         const page = new Adw.PreferencesPage();
-        page.add(this._buildHero());
-        page.add(this._buildGeneralGroup());
-        page.add(this._buildAppearanceGroup());
-        page.add(this._buildClipboardGroup());
-        page.add(this._buildAboutGroup());
+        const sections = [
+            ['header', () => this._buildHero()],
+            ['General', () => this._buildGeneralGroup()],
+            ['Appearance', () => createAppearanceGroup(settings, 'Applies to the popup and to this window')],
+            ['Clipboard', () => createClipboardGroup(settings)],
+            ['Project', () => this._buildAboutGroup()],
+        ];
+        for (const [name, build] of sections) {
+            try {
+                page.add(build());
+            } catch (e) {
+                console.error(`Clipdeck: could not build the ${name} section: ${e}\n${e.stack}`);
+                page.add(errorGroup(name, e));
+            }
+        }
         this._toasts.set_child(page);
 
         this._settingsIds = [
-            settings.connect('changed::toggle-popup', () => this._syncShortcut()),
-            settings.connect('changed::history-size', () => {
-                this._historyRow.value = settings.get_int('history-size');
-            }),
+            settings.connect('changed::toggle-popup', () => this._syncConflicts()),
         ];
 
         this._syncExtensionState();
-        this._syncShortcut();
+        this._syncConflicts();
 
         // Re-check conflicts when coming back from GNOME Settings.
         this.connect('notify::is-active', () => {
             if (this.is_active)
-                this._syncShortcut();
+                this._syncConflicts();
         });
         this.connect('close-request', () => {
             this._shell.destroy();
@@ -425,74 +330,10 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
         });
         group.add(this._enableRow);
 
-        this._shortcutRow = new Adw.ActionRow({
-            title: 'Open clipboard history',
-            subtitle: 'Shortcut that shows the Clipdeck popup',
-            activatable: true,
-        });
-        this._shortcutLabel = new Gtk.ShortcutLabel({valign: Gtk.Align.CENTER});
-        this._shortcutRow.add_suffix(this._shortcutLabel);
-        const resetButton = new Gtk.Button({
-            icon_name: 'edit-undo-symbolic',
-            valign: Gtk.Align.CENTER,
-            tooltip_text: 'Reset to Super+V',
-            css_classes: ['flat'],
-        });
-        resetButton.connect('clicked', () => this._settings.reset('toggle-popup'));
-        this._shortcutRow.add_suffix(resetButton);
-        this._shortcutRow.add_suffix(new Gtk.Image({icon_name: 'go-next-symbolic'}));
-        this._shortcutRow.connect('activated', () => this._chooseShortcut());
-        group.add(this._shortcutRow);
-
-        return group;
-    }
-
-    _buildAppearanceGroup() {
-        const group = new Adw.PreferencesGroup({
-            title: 'Appearance',
-            description: 'Applies to the popup and to this window',
-        });
-
-        const themes = ['system', 'light', 'dark'];
-        const themeRow = new Adw.ComboRow({
-            title: 'Theme',
-            model: Gtk.StringList.new(['Follow System', 'Light', 'Dark']),
-        });
-        themeRow.selected = Math.max(0, themes.indexOf(this._settings.get_string('theme')));
-        themeRow.connect('notify::selected', () =>
-            this._settings.set_string('theme', themes[themeRow.selected]));
-        group.add(themeRow);
-
-        const motionRow = new Adw.SwitchRow({
-            title: 'Reduce animations',
-            subtitle: 'Show and hide the popup instantly',
-        });
-        this._settings.bind('reduce-motion', motionRow, 'active', Gio.SettingsBindFlags.DEFAULT);
-        group.add(motionRow);
-
-        return group;
-    }
-
-    _buildClipboardGroup() {
-        const group = new Adw.PreferencesGroup({title: 'Clipboard'});
-
-        const imagesRow = new Adw.SwitchRow({
-            title: 'Screenshots and images',
-            subtitle: 'Keep PrtScr screenshots and copied images in the history',
-        });
-        this._settings.bind('enable-images', imagesRow, 'active', Gio.SettingsBindFlags.DEFAULT);
-        group.add(imagesRow);
-
-        this._historyRow = Adw.SpinRow.new_with_range(10, 200, 5);
-        this._historyRow.title = 'History size';
-        this._historyRow.subtitle = 'Older items are removed after this many';
-        this._historyRow.value = this._settings.get_int('history-size');
-        this._historyRow.connect('notify::value', () => {
-            const value = Math.round(this._historyRow.value);
-            if (value !== this._settings.get_int('history-size'))
-                this._settings.set_int('history-size', value);
-        });
-        group.add(this._historyRow);
+        group.add(createShortcutRow(this._settings, accel => {
+            this._toast(`Shortcut set to ${accelLabel(accel)}`);
+            this._syncConflicts();
+        }));
 
         return group;
     }
@@ -563,38 +404,20 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
         this._statusLabel.css_classes = ['clipdeck-status', cls];
     }
 
-    _syncShortcut() {
-        if (!this._shortcutLabel)
+    _syncConflicts() {
+        const conflict = describeConflicts(this._settings);
+        this._banner.revealed = conflict !== null;
+        this._bannerAction = null;
+        if (!conflict)
             return;
-        const accel = this._settings.get_strv('toggle-popup')[0] ?? '';
-        this._shortcutLabel.accelerator = parseAccel(accel) ? accel : '';
-        this._shortcutLabel.disabled_text = 'Disabled';
 
-        const conflicts = findConflicts(accel);
-        if (conflicts.length === 0) {
-            this._banner.revealed = false;
-            this._bannerAction = null;
-            return;
-        }
-
-        const names = conflicts.map(c => c.label).join(', ');
-        this._banner.title = `${accelLabel(accel)} is also used by: ${names}. Clipdeck will not open until it is freed.`;
+        this._banner.title = conflict.message;
         this._banner.button_label = 'Free Shortcut';
         this._bannerAction = () => {
-            conflicts.forEach(c => c.free());
-            this._toast(`${accelLabel(accel)} now opens Clipdeck`);
-            this._syncShortcut();
+            conflict.fix();
+            this._toast(`${accelLabel(conflict.accel)} now opens Clipdeck`);
+            this._syncConflicts();
         };
-        this._banner.revealed = true;
-    }
-
-    _chooseShortcut() {
-        const dialog = new ShortcutDialog(this);
-        dialog.connect('shortcut-chosen', (_d, accel) => {
-            this._settings.set_strv('toggle-popup', [accel]);
-            this._toast(`Shortcut set to ${accelLabel(accel)}`);
-        });
-        dialog.present();
     }
 
     _toast(title) {
@@ -605,6 +428,19 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
 /* ------------------------------------------------------------------ */
 /* Application                                                         */
 /* ------------------------------------------------------------------ */
+
+/** Placeholder for a section that failed to build, showing the error. */
+function errorGroup(name, error) {
+    const group = new Adw.PreferencesGroup({title: name});
+    const row = new Adw.ActionRow({
+        title: 'This section could not be loaded',
+        subtitle: GLib.markup_escape_text(`${error}`, -1),
+        css_classes: ['error'],
+    });
+    row.add_prefix(new Gtk.Image({icon_name: 'dialog-error-symbolic'}));
+    group.add(row);
+    return group;
+}
 
 function findLogoFile() {
     const candidates = [
@@ -666,17 +502,25 @@ class ClipdeckApplication extends Adw.Application {
         Gtk.StyleContext.add_provider_for_display(display, provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
 
-        this._settings = loadExtensionSettings();
+        const {settings, outdated} = loadExtensionSettings();
+        this._settings = settings;
+        this._schemaOutdated = outdated;
         if (this._settings) {
+            this._accentProvider = new Gtk.CssProvider();
+            Gtk.StyleContext.add_provider_for_display(display, this._accentProvider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+
             this._applyTheme();
             this._settings.connect('changed::theme', () => this._applyTheme());
+            this._settings.connect('changed::accent-color', () => this._applyTheme());
+            Adw.StyleManager.get_default().connect('notify::dark', () => this._applyTheme());
         }
     }
 
     vfunc_activate() {
         let window = this.active_window;
         if (!window)
-            window = new ClipdeckWindow(this, this._settings);
+            window = new ClipdeckWindow(this, this._settings, this._schemaOutdated);
         window.present();
     }
 
@@ -685,8 +529,24 @@ class ClipdeckApplication extends Adw.Application {
             light: Adw.ColorScheme.FORCE_LIGHT,
             dark: Adw.ColorScheme.FORCE_DARK,
         };
-        Adw.StyleManager.get_default().color_scheme =
+        const styleManager = Adw.StyleManager.get_default();
+        styleManager.color_scheme =
             schemes[this._settings.get_string('theme')] ?? Adw.ColorScheme.DEFAULT;
+
+        // Preview the popup's accent colour in this window too. "Follow
+        // system" leaves libadwaita's own (system) accent alone.
+        const value = this._settings.settings_schema.has_key('accent-color')
+            ? this._settings.get_string('accent-color')
+            : 'clipdeck';
+        let css = '';
+        if (value !== 'system') {
+            const bg = resolveAccent(value);
+            const fg = styleManager.dark ? shade(bg, 0.35) : shade(bg, -0.1);
+            css = Adw.get_minor_version() >= 6
+                ? `:root { --accent-bg-color: ${bg}; --accent-color: ${fg}; }`
+                : `@define-color accent_bg_color ${bg}; @define-color accent_color ${fg};`;
+        }
+        this._accentProvider.load_from_string(css);
     }
 
     _addAction(name, callback) {

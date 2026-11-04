@@ -7,31 +7,46 @@ DIST       := dist
 ZIP        := $(DIST)/$(UUID).shell-extension.zip
 DEB        := $(DIST)/clipdeck_$(VERSION)_all.deb
 
+# System-wide install (used by `make deb` and debian/rules)
+PREFIX     ?= /usr
+DESTDIR    ?=
+SHARE      := $(DESTDIR)$(PREFIX)/share
+
 # Per-user install locations (make install)
 LOCAL_DATA := $(HOME)/.local/share
 LOCAL_BIN  := $(HOME)/.local/bin
 LOCAL_APP  := $(LOCAL_DATA)/clipdeck
 
 ICON_SIZES := 16 24 32 48 64 128 256 512
+# The desktop entry points at this file directly: GNOME Shell on some systems
+# does not resolve the themed icon name, while a full path always works.
+ICON_FILE  := icons/hicolor/256x256/apps/$(APP_ID).png
+EXT_FILES  := extension/metadata.json extension/extension.js extension/prefs.js \
+              extension/settingsUi.js extension/accent.js extension/stylesheet.css
+APP_FILES  := app/main.js extension/settingsUi.js extension/accent.js assets/logo.png
 
-.PHONY: all pack install install-extension install-app uninstall enable disable \
-        run-app schemas deb logs lint clean help
+.PHONY: all help pack install install-extension install-app uninstall enable disable \
+        schemas run-app install-system deb ppa-source logs clean
 
 all: pack
 
 help:
-	@echo "make install    Install the extension and the settings app for this user"
-	@echo "make uninstall  Remove both again"
-	@echo "make deb        Build $(DEB) (install with: sudo apt install ./$(DEB))"
-	@echo "make run-app    Run the settings app from this folder"
-	@echo "make enable     Turn the extension on   |  make disable  Turn it off"
-	@echo "make logs       Follow GNOME Shell logs"
+	@echo "make install         Install the extension and the settings app for this user"
+	@echo "make uninstall       Remove both again"
+	@echo "make deb             Build $(DEB) (install with: sudo apt install --reinstall ./$(DEB))"
+	@echo "make pack            Build the extension zip for extensions.gnome.org"
+	@echo "make ppa-source      Build a signed source package for a Launchpad PPA"
+	@echo "make run-app         Run the settings app from this folder"
+	@echo "make enable/disable  Turn the extension on or off"
+	@echo "make logs            Follow GNOME Shell logs"
 
 ## ---------------------------------------------------------------- extension
 
+# The zip uploaded to extensions.gnome.org. gnome-extensions only picks up
+# extension.js, prefs.js, metadata.json, stylesheet.css and schemas/ itself.
 pack:
 	mkdir -p $(DIST)
-	gnome-extensions pack --force --out-dir=$(DIST) extension
+	gnome-extensions pack --force --out-dir=$(DIST) --extra-source=settingsUi.js --extra-source=accent.js extension
 
 install-extension: pack
 	gnome-extensions install --force $(ZIP)
@@ -52,10 +67,10 @@ run-app: schemas
 
 install-app:
 	install -d $(LOCAL_APP) $(LOCAL_BIN) $(LOCAL_DATA)/applications
-	install -m644 app/main.js assets/logo.png $(LOCAL_APP)/
+	install -m644 $(APP_FILES) $(LOCAL_APP)/
 	sed 's|@APPDIR@|$(LOCAL_APP)|' app/clipdeck.in > $(LOCAL_BIN)/clipdeck
 	chmod 755 $(LOCAL_BIN)/clipdeck
-	sed 's|@BINDIR@|$(LOCAL_BIN)|' data/$(APP_ID).desktop.in \
+	sed -e 's|@BINDIR@|$(LOCAL_BIN)|' -e 's|@ICON@|$(LOCAL_DATA)/$(ICON_FILE)|' data/$(APP_ID).desktop.in \
 		> $(LOCAL_DATA)/applications/$(APP_ID).desktop
 	for size in $(ICON_SIZES); do \
 		install -Dm644 data/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png \
@@ -76,39 +91,44 @@ uninstall:
 	rm -f $(LOCAL_BIN)/clipdeck $(LOCAL_DATA)/applications/$(APP_ID).desktop
 	rm -f $(foreach s,$(ICON_SIZES),$(LOCAL_DATA)/icons/hicolor/$(s)x$(s)/apps/$(APP_ID).png)
 
-## ---------------------------------------------------------------------- deb
+## ------------------------------------------------------- system / packages
 
-deb:
-	rm -rf $(DIST)/deb
-	$(eval ROOT := $(DIST)/deb)
-	install -d $(ROOT)/DEBIAN $(ROOT)/usr/bin $(ROOT)/usr/share/clipdeck \
-		$(ROOT)/usr/share/applications $(ROOT)/usr/share/metainfo \
-		$(ROOT)/usr/share/glib-2.0/schemas $(ROOT)/usr/share/doc/clipdeck \
-		$(ROOT)/usr/share/gnome-shell/extensions/$(UUID)
-	# GNOME Shell extension (schema goes to the system schema directory)
-	install -m644 extension/metadata.json extension/extension.js extension/stylesheet.css \
-		$(ROOT)/usr/share/gnome-shell/extensions/$(UUID)/
+# Installs everything under $(DESTDIR)$(PREFIX). The settings schema goes to
+# the system schema directory, where the glib dpkg trigger compiles it.
+install-system:
+	install -d $(SHARE)/gnome-shell/extensions/$(UUID) $(SHARE)/glib-2.0/schemas \
+		$(SHARE)/clipdeck $(SHARE)/applications $(SHARE)/metainfo $(DESTDIR)$(PREFIX)/bin
+	install -m644 $(EXT_FILES) $(SHARE)/gnome-shell/extensions/$(UUID)/
 	install -m644 extension/schemas/org.gnome.shell.extensions.clipdeck.gschema.xml \
-		$(ROOT)/usr/share/glib-2.0/schemas/
-	# Settings app
-	install -m644 app/main.js assets/logo.png $(ROOT)/usr/share/clipdeck/
-	sed 's|@APPDIR@|/usr/share/clipdeck|' app/clipdeck.in > $(ROOT)/usr/bin/clipdeck
-	chmod 755 $(ROOT)/usr/bin/clipdeck
-	sed 's|@BINDIR@|/usr/bin|' data/$(APP_ID).desktop.in > $(ROOT)/usr/share/applications/$(APP_ID).desktop
-	install -m644 data/$(APP_ID).metainfo.xml $(ROOT)/usr/share/metainfo/
+		$(SHARE)/glib-2.0/schemas/
+	install -m644 $(APP_FILES) $(SHARE)/clipdeck/
+	sed 's|@APPDIR@|$(PREFIX)/share/clipdeck|' app/clipdeck.in > $(DESTDIR)$(PREFIX)/bin/clipdeck
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/clipdeck
+	sed -e 's|@BINDIR@|$(PREFIX)/bin|' -e 's|@ICON@|$(PREFIX)/share/$(ICON_FILE)|' \
+		data/$(APP_ID).desktop.in > $(SHARE)/applications/$(APP_ID).desktop
+	install -m644 data/$(APP_ID).metainfo.xml $(SHARE)/metainfo/
 	for size in $(ICON_SIZES); do \
 		install -Dm644 data/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png \
-			$(ROOT)/usr/share/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png; \
+			$(SHARE)/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png; \
 	done
-	install -m644 packaging/debian/copyright $(ROOT)/usr/share/doc/clipdeck/
-	# Package metadata
+
+# Quick binary package without debhelper: `sudo apt install ./dist/...deb`.
+deb:
+	rm -rf $(DIST)/deb
+	$(MAKE) --no-print-directory install-system DESTDIR=$(DIST)/deb PREFIX=/usr
+	install -Dm644 debian/copyright $(DIST)/deb/usr/share/doc/clipdeck/copyright
+	install -d $(DIST)/deb/DEBIAN
 	sed -e 's|@VERSION@|$(VERSION)|' -e 's|@MAINTAINER@|$(MAINTAINER)|' \
-		packaging/debian/control.in > $(ROOT)/DEBIAN/control
-	echo "Installed-Size: $$(du -sk --exclude=DEBIAN $(ROOT) | cut -f1)" >> $(ROOT)/DEBIAN/control
-	install -m755 packaging/debian/postinst $(ROOT)/DEBIAN/
-	dpkg-deb --root-owner-group --build $(ROOT) $(DEB)
+		packaging/control.in > $(DIST)/deb/DEBIAN/control
+	echo "Installed-Size: $$(du -sk --exclude=DEBIAN $(DIST)/deb | cut -f1)" >> $(DIST)/deb/DEBIAN/control
+	dpkg-deb --root-owner-group --build $(DIST)/deb $(DEB)
 	@echo
-	@echo "Built $(DEB). Install it with: sudo apt install ./$(DEB)"
+	@echo "Built $(DEB). Install or update it with:"
+	@echo "  sudo apt install --reinstall ./$(DEB)"
+
+# Signed source package for Launchpad (see docs/PUBLISHING.md).
+ppa-source:
+	debuild -S -sa -d
 
 ## -------------------------------------------------------------------- misc
 

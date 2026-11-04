@@ -21,6 +21,8 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as AnimationUtils from 'resource:///org/gnome/shell/misc/animationUtils.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
+import {popupAccentCss, resolveAccent} from './accent.js';
+
 const MAX_TEXT_LENGTH = 100_000;
 const PREVIEW_MAX_CHARS = 160;
 const PREVIEW_MAX_LINES = 3;
@@ -253,6 +255,8 @@ class ClipboardPopup {
         this._box = makeBox({style_class: 'clipdeck-popup', reactive: true}, true);
         if (this._ext.useDarkTheme)
             this._box.add_style_class_name('clipdeck-dark');
+        if (this._ext.hasCustomAccent)
+            this._box.add_style_class_name('clipdeck-accent');
         this._box.add_child(this._buildHeader());
 
         this._list = makeBox({style_class: 'clipdeck-list', x_expand: true}, true);
@@ -292,9 +296,6 @@ class ClipboardPopup {
         this._rebuildList(animate);
         const fromAbove = this._placeAt(anchor);
         this._focusIndex(0);
-
-        console.log(`[Clipdeck] popup opened at ${this._box.x},${this._box.y} ` +
-            `(anchor: ${anchor.source}), items=${this._buttons.length}`);
 
         if (!animate)
             return;
@@ -579,7 +580,20 @@ export default class ClipdeckExtension extends Extension {
         this._interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._settingsChangedIds = [
             this._settings.connect('changed::history-size', () => this._trimHistory()),
+            this._settings.connect('changed::accent-color', () => this._applyAccent()),
         ];
+        // GNOME 47+ has a system accent colour that "Follow system" tracks.
+        this._interfaceChangedId = this._interfaceSettings.settings_schema.has_key('accent-color')
+            ? this._interfaceSettings.connect('changed::accent-color', () => this._applyAccent())
+            : 0;
+
+        // A shell theme change replaces the St.Theme and drops our stylesheet.
+        this._themeContext = St.ThemeContext.get_for_stage(global.stage);
+        this._themeChangedId = this._themeContext.connect('changed', () => this._applyAccent(true));
+        this._accentDir = this._prepareCacheDir('theme');
+        this._accentFile = null;
+        this._accentHex = null;
+        this._applyAccent();
 
         this._popup = new ClipboardPopup(this);
 
@@ -589,7 +603,6 @@ export default class ClipdeckExtension extends Extension {
             Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW | Shell.ActionMode.POPUP,
             () => {
-                console.log('[Clipdeck] shortcut pressed');
                 try {
                     this._popup.toggle();
                 } catch (e) {
@@ -597,8 +610,6 @@ export default class ClipdeckExtension extends Extension {
                 }
             });
 
-        console.log(`[Clipdeck] enabled, shortcut=${JSON.stringify(
-            this._settings.get_strv('toggle-popup'))}, action=${action}`);
         if (!action)
             console.warn('[Clipdeck] shortcut could not be registered (already taken?)');
 
@@ -611,7 +622,17 @@ export default class ClipdeckExtension extends Extension {
 
         this._settingsChangedIds?.forEach(id => this._settings.disconnect(id));
         this._settingsChangedIds = null;
+        if (this._interfaceChangedId)
+            this._interfaceSettings.disconnect(this._interfaceChangedId);
+        this._interfaceChangedId = 0;
         this._interfaceSettings = null;
+
+        if (this._themeChangedId)
+            this._themeContext.disconnect(this._themeChangedId);
+        this._themeChangedId = 0;
+        this._unloadAccent();
+        this._themeContext = null;
+        this._accentDir = null;
 
         this._popup?.close({animate: false});
         this._popup = null;
@@ -643,6 +664,10 @@ export default class ClipdeckExtension extends Extension {
 
     get reduceMotion() {
         return this._settings?.get_boolean('reduce-motion') ?? false;
+    }
+
+    get hasCustomAccent() {
+        return this._accentFile !== null;
     }
 
     get useDarkTheme() {
@@ -798,8 +823,75 @@ export default class ClipdeckExtension extends Extension {
             deleteFile(entry.path);
     }
 
+    /**
+     * Load a small generated stylesheet with the chosen accent colour. The
+     * file name contains the colour, so St never serves a stale cached copy.
+     */
+    _applyAccent(themeChanged = false) {
+        // Loading a stylesheet emits St.ThemeContext::changed synchronously.
+        if (this._applyingAccent)
+            return;
+        this._applyingAccent = true;
+        try {
+            this._doApplyAccent(themeChanged);
+        } finally {
+            this._applyingAccent = false;
+        }
+    }
+
+    _doApplyAccent(themeChanged) {
+        const systemAccent = this._interfaceChangedId
+            ? this._interfaceSettings.get_string('accent-color')
+            : null;
+        // An outdated compiled schema (older install) may lack the key.
+        const value = this._settings.settings_schema.has_key('accent-color')
+            ? this._settings.get_string('accent-color')
+            : 'clipdeck';
+        const hex = resolveAccent(value, systemAccent);
+        if (hex === this._accentHex && !themeChanged)
+            return;
+
+        // Always load the generated stylesheet, even for the default purple,
+        // so every colour is derived the same way (stylesheet.css is only the
+        // fallback if loading fails).
+        const theme = this._themeContext.get_theme();
+        const loaded = this._accentFile &&
+            theme.get_custom_stylesheets().some(f => f.equal(this._accentFile));
+        if (hex === this._accentHex && loaded)
+            return;
+
+        this._unloadAccent();
+        this._accentHex = hex;
+
+        const file = this._accentDir.get_child(`accent-${hex.slice(1)}.css`);
+        try {
+            file.replace_contents(new TextEncoder().encode(popupAccentCss(hex)), null, false,
+                Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+            this._accentFile = file;
+            theme.load_stylesheet(file);
+        } catch (e) {
+            this._accentFile = null;
+            console.warn(`[Clipdeck] could not apply accent colour ${hex}: ${e.message}`);
+            deleteFile(file.get_path());
+        }
+    }
+
+    _unloadAccent() {
+        if (!this._accentFile)
+            return;
+        this._themeContext?.get_theme()?.unload_stylesheet(this._accentFile);
+        deleteFile(this._accentFile.get_path());
+        this._accentFile = null;
+        this._accentHex = null;
+    }
+
     _prepareImageDir() {
-        const path = GLib.build_filenamev([GLib.get_user_cache_dir(), 'clipdeck', 'images']);
+        return this._prepareCacheDir('images');
+    }
+
+    /** ~/.cache/clipdeck/<name>, emptied: nothing in it outlives a session. */
+    _prepareCacheDir(name) {
+        const path = GLib.build_filenamev([GLib.get_user_cache_dir(), 'clipdeck', name]);
         GLib.mkdir_with_parents(path, 0o700);
         const dir = Gio.File.new_for_path(path);
 

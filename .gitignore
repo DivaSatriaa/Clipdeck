@@ -2,3 +2,9 @@ dist/
 extension/schemas/gschemas.compiled
 *.zip
 node_modules/
+debian/clipdeck/
+debian/.debhelper/
+debian/files
+debian/*.substvars
+debian/*.debhelper.log
+debian/debhelper-build-stamp

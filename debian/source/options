@@ -1,0 +1,4 @@
+# Keep build output and git metadata out of the source package.
+tar-ignore = .git
+tar-ignore = dist
+tar-ignore = node_modules
