@@ -68,31 +68,58 @@ const ExtensionState = {
  * `make install` from source only ships it inside the extension folder,
  * and a source checkout keeps it next to this file.
  */
+// Every key this app reads. A schema missing one of them is left over from
+// an older Clipdeck install.
+const REQUIRED_KEYS = [
+    'toggle-popup', 'theme', 'accent-color', 'reduce-motion', 'enable-images', 'history-size',
+];
+
+/**
+ * Find the Clipdeck settings schema. It can be installed system-wide (the
+ * .deb), inside the per-user extension folder (`make install`) or next to
+ * the sources. When several copies exist, prefer one that has every key:
+ * an outdated copy (for example from an older .deb) would otherwise hide
+ * new settings.
+ *
+ * Returns {settings, outdated}; settings is null when nothing is installed.
+ */
 function loadExtensionSettings() {
     const defaultSource = Gio.SettingsSchemaSource.get_default();
-    const schema = defaultSource?.lookup(SCHEMA_ID, true);
-    if (schema)
-        return new Gio.Settings({settings_schema: schema});
+    const found = [];
 
-    const candidates = [
+    const fromDefault = defaultSource?.lookup(SCHEMA_ID, true);
+    if (fromDefault)
+        found.push({schema: fromDefault, where: 'system schemas'});
+
+    const dirs = [
         GLib.getenv('CLIPDECK_SCHEMA_DIR'),
         GLib.build_filenamev([GLib.get_user_data_dir(), 'gnome-shell', 'extensions', UUID, 'schemas']),
         GLib.build_filenamev(['/usr/share/gnome-shell/extensions', UUID, 'schemas']),
         GLib.build_filenamev([APP_DIR, '..', 'extension', 'schemas']),
     ];
-    for (const dir of candidates) {
+    for (const dir of dirs) {
         if (!dir || !GLib.file_test(GLib.build_filenamev([dir, 'gschemas.compiled']), GLib.FileTest.EXISTS))
             continue;
         try {
             const source = Gio.SettingsSchemaSource.new_from_directory(dir, defaultSource, false);
-            const found = source.lookup(SCHEMA_ID, false);
-            if (found)
-                return new Gio.Settings({settings_schema: found});
+            const schema = source.lookup(SCHEMA_ID, false);
+            if (schema)
+                found.push({schema, where: dir});
         } catch (e) {
             console.warn(`Clipdeck: could not read schemas in ${dir}: ${e.message}`);
         }
     }
-    return null;
+
+    if (found.length === 0)
+        return {settings: null, outdated: false};
+
+    const complete = found.find(({schema}) => REQUIRED_KEYS.every(key => schema.has_key(key)));
+    const chosen = complete ?? found[0];
+    if (!complete) {
+        const missing = REQUIRED_KEYS.filter(key => !chosen.schema.has_key(key));
+        console.warn(`Clipdeck: settings schema in ${chosen.where} is outdated, missing: ${missing.join(', ')}`);
+    }
+    return {settings: new Gio.Settings({settings_schema: chosen.schema}), outdated: !complete};
 }
 
 /* ------------------------------------------------------------------ */
@@ -151,7 +178,7 @@ class ShellExtensions {
 
 const ClipdeckWindow = GObject.registerClass(
 class ClipdeckWindow extends Adw.ApplicationWindow {
-    _init(app, settings) {
+    _init(app, settings, schemaOutdated = false) {
         super._init({
             application: app,
             title: 'Clipdeck',
@@ -171,6 +198,13 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
         this._banner = new Adw.Banner({revealed: false});
         this._banner.connect('button-clicked', () => this._bannerAction?.());
         toolbar.add_top_bar(this._banner);
+
+        // An older Clipdeck install left its settings schema behind.
+        toolbar.add_top_bar(new Adw.Banner({
+            revealed: schemaOutdated,
+            title: 'An older Clipdeck installation is still active, so some settings are ' +
+                'unavailable. Reinstall Clipdeck, then log out and back in.',
+        }));
 
         this._toasts = new Adw.ToastOverlay();
         toolbar.set_content(this._toasts);
@@ -464,7 +498,9 @@ class ClipdeckApplication extends Adw.Application {
         Gtk.StyleContext.add_provider_for_display(display, provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
 
-        this._settings = loadExtensionSettings();
+        const {settings, outdated} = loadExtensionSettings();
+        this._settings = settings;
+        this._schemaOutdated = outdated;
         if (this._settings) {
             this._accentProvider = new Gtk.CssProvider();
             Gtk.StyleContext.add_provider_for_display(display, this._accentProvider,
@@ -480,7 +516,7 @@ class ClipdeckApplication extends Adw.Application {
     vfunc_activate() {
         let window = this.active_window;
         if (!window)
-            window = new ClipdeckWindow(this, this._settings);
+            window = new ClipdeckWindow(this, this._settings, this._schemaOutdated);
         window.present();
     }
 
@@ -495,7 +531,9 @@ class ClipdeckApplication extends Adw.Application {
 
         // Preview the popup's accent colour in this window too. "Follow
         // system" leaves libadwaita's own (system) accent alone.
-        const value = this._settings.get_string('accent-color');
+        const value = this._settings.settings_schema.has_key('accent-color')
+            ? this._settings.get_string('accent-color')
+            : 'clipdeck';
         let css = '';
         if (value !== 'system') {
             const bg = resolveAccent(value);

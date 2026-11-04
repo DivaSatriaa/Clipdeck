@@ -56,10 +56,13 @@ Build the package from source, then install it with apt, which also pulls in the
 git clone https://github.com/divasatriaa/clipdeck.git
 cd clipdeck
 make deb
-sudo apt install ./dist/clipdeck_0.2.0_all.deb
+sudo apt install --reinstall ./dist/clipdeck_0.2.0_all.deb
 ```
 
 Then **log out and back in** (GNOME Shell only discovers new extensions at login), open **Clipdeck** from the app grid and switch on **Enable Clipdeck**.
+
+> [!TIP]
+> `--reinstall` makes apt replace the files even when the version number has not changed, for example after pulling new commits.
 
 To remove it:
 
@@ -130,6 +133,21 @@ To check manually:
 ```bash
 dconf dump / | grep -i -B3 "super>v"
 ```
+
+</details>
+
+<details>
+<summary><b>The app says an older Clipdeck installation is still active</b></summary>
+
+Clipdeck found an old copy of its settings schema, usually because the `.deb` and `make install` were mixed, or because apt skipped a package with the same version number. Remove every copy, then install one way only:
+
+```bash
+make uninstall
+sudo apt remove clipdeck
+sudo apt install --reinstall ./dist/clipdeck_0.2.0_all.deb
+```
+
+Log out and back in afterwards.
 
 </details>
 

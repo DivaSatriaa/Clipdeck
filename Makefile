@@ -30,7 +30,7 @@ all: pack
 help:
 	@echo "make install         Install the extension and the settings app for this user"
 	@echo "make uninstall       Remove both again"
-	@echo "make deb             Build $(DEB) (install with: sudo apt install ./$(DEB))"
+	@echo "make deb             Build $(DEB) (install with: sudo apt install --reinstall ./$(DEB))"
 	@echo "make pack            Build the extension zip for extensions.gnome.org"
 	@echo "make ppa-source      Build a signed source package for a Launchpad PPA"
 	@echo "make run-app         Run the settings app from this folder"
@@ -119,7 +119,8 @@ deb:
 	echo "Installed-Size: $$(du -sk --exclude=DEBIAN $(DIST)/deb | cut -f1)" >> $(DIST)/deb/DEBIAN/control
 	dpkg-deb --root-owner-group --build $(DIST)/deb $(DEB)
 	@echo
-	@echo "Built $(DEB). Install it with: sudo apt install ./$(DEB)"
+	@echo "Built $(DEB). Install or update it with:"
+	@echo "  sudo apt install --reinstall ./$(DEB)"
 
 # Signed source package for Launchpad (see docs/PUBLISHING.md).
 ppa-source:

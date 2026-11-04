@@ -254,7 +254,9 @@ export function createAppearanceGroup(settings, description) {
         settings.set_string('theme', themes[themeRow.selected]));
     group.add(themeRow);
 
-    group.add(createAccentRow(settings));
+    // Skip the row when an older install's schema has no accent-color key.
+    if (settings.settings_schema.has_key('accent-color'))
+        group.add(createAccentRow(settings));
 
     const motionRow = new Adw.SwitchRow({
         title: 'Reduce animations',

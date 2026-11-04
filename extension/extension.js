@@ -843,7 +843,11 @@ export default class ClipdeckExtension extends Extension {
         const systemAccent = this._interfaceChangedId
             ? this._interfaceSettings.get_string('accent-color')
             : null;
-        const hex = resolveAccent(this._settings.get_string('accent-color'), systemAccent);
+        // An outdated compiled schema (older install) may lack the key.
+        const value = this._settings.settings_schema.has_key('accent-color')
+            ? this._settings.get_string('accent-color')
+            : 'clipdeck';
+        const hex = resolveAccent(value, systemAccent);
         if (hex === this._accentHex && !themeChanged)
             return;
 
