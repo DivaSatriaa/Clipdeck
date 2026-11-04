@@ -187,12 +187,24 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
             return;
         }
 
+        // Build each section on its own: one failing section (for example a
+        // GTK API that changed) must not leave the whole window blank.
         const page = new Adw.PreferencesPage();
-        page.add(this._buildHero());
-        page.add(this._buildGeneralGroup());
-        page.add(createAppearanceGroup(settings, 'Applies to the popup and to this window'));
-        page.add(createClipboardGroup(settings));
-        page.add(this._buildAboutGroup());
+        const sections = [
+            ['header', () => this._buildHero()],
+            ['General', () => this._buildGeneralGroup()],
+            ['Appearance', () => createAppearanceGroup(settings, 'Applies to the popup and to this window')],
+            ['Clipboard', () => createClipboardGroup(settings)],
+            ['Project', () => this._buildAboutGroup()],
+        ];
+        for (const [name, build] of sections) {
+            try {
+                page.add(build());
+            } catch (e) {
+                console.error(`Clipdeck: could not build the ${name} section: ${e}\n${e.stack}`);
+                page.add(errorGroup(name, e));
+            }
+        }
         this._toasts.set_child(page);
 
         this._settingsIds = [
@@ -378,6 +390,19 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
 /* ------------------------------------------------------------------ */
 /* Application                                                         */
 /* ------------------------------------------------------------------ */
+
+/** Placeholder for a section that failed to build, showing the error. */
+function errorGroup(name, error) {
+    const group = new Adw.PreferencesGroup({title: name});
+    const row = new Adw.ActionRow({
+        title: 'This section could not be loaded',
+        subtitle: GLib.markup_escape_text(`${error}`, -1),
+        css_classes: ['error'],
+    });
+    row.add_prefix(new Gtk.Image({icon_name: 'dialog-error-symbolic'}));
+    group.add(row);
+    return group;
+}
 
 function findLogoFile() {
     const candidates = [
