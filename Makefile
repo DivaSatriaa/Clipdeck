@@ -18,6 +18,9 @@ LOCAL_BIN  := $(HOME)/.local/bin
 LOCAL_APP  := $(LOCAL_DATA)/clipdeck
 
 ICON_SIZES := 16 24 32 48 64 128 256 512
+# The desktop entry points at this file directly: GNOME Shell on some systems
+# does not resolve the themed icon name, while a full path always works.
+ICON_FILE  := icons/hicolor/256x256/apps/$(APP_ID).png
 EXT_FILES  := extension/metadata.json extension/extension.js extension/prefs.js \
               extension/settingsUi.js extension/accent.js extension/stylesheet.css
 APP_FILES  := app/main.js extension/settingsUi.js extension/accent.js assets/logo.png
@@ -67,7 +70,7 @@ install-app:
 	install -m644 $(APP_FILES) $(LOCAL_APP)/
 	sed 's|@APPDIR@|$(LOCAL_APP)|' app/clipdeck.in > $(LOCAL_BIN)/clipdeck
 	chmod 755 $(LOCAL_BIN)/clipdeck
-	sed 's|@BINDIR@|$(LOCAL_BIN)|' data/$(APP_ID).desktop.in \
+	sed -e 's|@BINDIR@|$(LOCAL_BIN)|' -e 's|@ICON@|$(LOCAL_DATA)/$(ICON_FILE)|' data/$(APP_ID).desktop.in \
 		> $(LOCAL_DATA)/applications/$(APP_ID).desktop
 	for size in $(ICON_SIZES); do \
 		install -Dm644 data/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png \
@@ -101,7 +104,8 @@ install-system:
 	install -m644 $(APP_FILES) $(SHARE)/clipdeck/
 	sed 's|@APPDIR@|$(PREFIX)/share/clipdeck|' app/clipdeck.in > $(DESTDIR)$(PREFIX)/bin/clipdeck
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/clipdeck
-	sed 's|@BINDIR@|$(PREFIX)/bin|' data/$(APP_ID).desktop.in > $(SHARE)/applications/$(APP_ID).desktop
+	sed -e 's|@BINDIR@|$(PREFIX)/bin|' -e 's|@ICON@|$(PREFIX)/share/$(ICON_FILE)|' \
+		data/$(APP_ID).desktop.in > $(SHARE)/applications/$(APP_ID).desktop
 	install -m644 data/$(APP_ID).metainfo.xml $(SHARE)/metainfo/
 	for size in $(ICON_SIZES); do \
 		install -Dm644 data/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png \
