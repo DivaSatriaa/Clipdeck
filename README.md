@@ -37,6 +37,12 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
   &nbsp;
   <img src="docs/screenshots/app-dark.png" width="380" alt="Clipdeck settings app, dark theme">
 </p>
+<p align="center">
+  <img width="395" height="205" alt="image" src="https://github.com/user-attachments/assets/6685488b-b087-4e10-8f24-b0df47ffb149" />
+  &nbsp;
+  <img width="399" height="129" alt="image" src="https://github.com/user-attachments/assets/63ec3dbe-9d3b-471f-bfb4-f1f9fdcf2951" />
+</p>
+
 
 ## Requirements
 
