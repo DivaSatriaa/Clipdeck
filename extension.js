@@ -16,7 +16,7 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as Util from 'resource:///org/gnome/shell/misc/util.js';
+import * as AnimationUtils from 'resource:///org/gnome/shell/misc/animationUtils.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const MAX_ITEMS = 50;
@@ -25,6 +25,7 @@ const PREVIEW_MAX_CHARS = 160;
 const PREVIEW_MAX_LINES = 3;
 const PASTE_DELAY_MS = 120;
 const SCREEN_MARGIN = 12;
+const CARET_GAP = 6;
 
 // Password managers (KeePassXC, etc.) tag secrets with this MIME type.
 const PASSWORD_HINT_MIME = 'x-kde-passwordManagerHint';
@@ -59,6 +60,21 @@ function makeBox(params, vertical = false) {
     return box;
 }
 
+/**
+ * Put a scrollable child into an St.ScrollView.
+ *
+ * GNOME 45: St.ScrollView is an St.Bin, and only ClutterContainer.add_actor()
+ * registers the scrollable child. St.Bin.set_child() adds the actor but leaves
+ * the scroll view's internal child unset, so the view measures 0px high and the
+ * list is invisible. GNOME 46+ removed add_actor() and uses set_child().
+ */
+function setScrollChild(scrollView, child) {
+    if (typeof scrollView.add_actor === 'function')
+        scrollView.add_actor(child);
+    else
+        scrollView.set_child(child);
+}
+
 /** Short, card-friendly preview of a clipboard entry. */
 function makePreview(text) {
     const lines = text.trim().replace(/\t/g, '    ').split(/\r?\n/);
@@ -70,6 +86,53 @@ function makePreview(text) {
     if (cut)
         preview += ' …';
     return preview;
+}
+
+/**
+ * Where should the popup appear? Like Windows, prefer the text caret of the
+ * field being typed in, then the focused window, then the mouse pointer.
+ *
+ * The caret is only known when the app reports it to GNOME's input method
+ * (native Wayland apps using text-input, with IBus running). XWayland apps such
+ * as Chrome without --ozone-platform=wayland do not, so they fall back to the
+ * focused window.
+ */
+function getTypingAnchor() {
+    const window = global.display.get_focus_window();
+    const frame = window?.get_frame_rect();
+
+    const im = Main.inputMethod;
+    const caret = im?._currentFocus ? im._cursorRect : null;
+    if (caret && caret.width >= 0 && caret.height > 0 &&
+        (!frame || rectContains(frame, caret.x, caret.y))) {
+        return {
+            source: 'caret',
+            x: caret.x,
+            y: caret.y,
+            height: caret.height,
+            centered: false,
+        };
+    }
+
+    if (frame && frame.width > 0 && frame.height > 0) {
+        // Horizontally centered, a third of the way down: roughly where text
+        // fields sit in most windows (search boxes, chat inputs, editors).
+        return {
+            source: 'window',
+            x: frame.x + frame.width / 2,
+            y: frame.y + frame.height / 3,
+            height: 0,
+            centered: true,
+        };
+    }
+
+    const [x, y] = global.get_pointer();
+    return {source: 'pointer', x, y, height: 0, centered: false};
+}
+
+function rectContains(rect, x, y) {
+    return x >= rect.x && x < rect.x + rect.width &&
+        y >= rect.y && y < rect.y + rect.height;
 }
 
 function getDefaultSeat() {
@@ -104,6 +167,20 @@ class ClipboardPopup {
         if (this.isOpen)
             return;
 
+        // Read where the user is typing *before* the modal grab: pushModal()
+        // moves focus away from the app and the input method forgets the caret.
+        const anchor = getTypingAnchor();
+
+        try {
+            this._build();
+            this._show(anchor);
+        } catch (e) {
+            console.error(`[Clipdeck] popup failed: ${e}\n${e.stack}`);
+            this.close();
+        }
+    }
+
+    _build() {
         // Full-screen transparent layer: catches clicks outside the popup.
         this._backdrop = new St.Widget({
             reactive: true,
@@ -131,7 +208,7 @@ class ClipboardPopup {
             overlay_scrollbars: true,
             x_expand: true,
         });
-        this._scroll.set_child(this._list);
+        setScrollChild(this._scroll, this._list);
         this._box.add_child(this._scroll);
 
         this._box.add_child(new St.Label({
@@ -141,7 +218,9 @@ class ClipboardPopup {
 
         this._backdrop.add_child(this._box);
         Main.uiGroup.add_child(this._backdrop);
+    }
 
+    _show(anchor) {
         this._grab = Main.pushModal(this._backdrop, {actionMode: Shell.ActionMode.POPUP});
         if ((this._grab.get_seat_state() & Clutter.GrabState.KEYBOARD) === 0) {
             // Another component holds the keyboard; bail out cleanly.
@@ -151,10 +230,11 @@ class ClipboardPopup {
         }
 
         this._rebuildList();
-        this._placeNearPointer();
+        this._placeAt(anchor);
         this._focusIndex(0);
 
-        console.log(`[Clipdeck] popup opened at ${this._box.x},${this._box.y}, items=${this._buttons.length}`);
+        console.log(`[Clipdeck] popup opened at ${this._box.x},${this._box.y} ` +
+            `(anchor: ${anchor.source}), items=${this._buttons.length}`);
 
         this._box.opacity = 0;
         this._box.translation_y = 6;
@@ -175,7 +255,7 @@ class ClipboardPopup {
             this._grab = null;
         }
 
-        this._backdrop.destroy();
+        this._backdrop?.destroy();
         this._backdrop = null;
         this._box = null;
         this._scroll = null;
@@ -251,7 +331,7 @@ class ClipboardPopup {
             button.connect('clicked', () => this._ext.activateEntry(entry));
             button.connect('key-focus-in', () => {
                 if (this._scroll)
-                    Util.ensureActorVisibleInScrollView?.(this._scroll, button);
+                    AnimationUtils.ensureActorVisibleInScrollView(this._scroll, button);
             });
             button._clipdeckEntry = entry;
 
@@ -260,11 +340,9 @@ class ClipboardPopup {
         }
     }
 
-    _placeNearPointer() {
-        const [pointerX, pointerY] = global.get_pointer();
-        const monitorIndex = global.display.get_current_monitor();
-        const monitor = Main.layoutManager.monitors[monitorIndex] ??
-            Main.layoutManager.primaryMonitor;
+    _placeAt(anchor) {
+        const monitor = Main.layoutManager.monitors.find(m =>
+            rectContains(m, anchor.x, anchor.y)) ?? Main.layoutManager.primaryMonitor;
 
         const [, width] = this._box.get_preferred_width(-1);
         const [, height] = this._box.get_preferred_height(width);
@@ -274,8 +352,16 @@ class ClipboardPopup {
         const maxX = monitor.x + monitor.width - width - SCREEN_MARGIN;
         const maxY = monitor.y + monitor.height - height - SCREEN_MARGIN;
 
-        const x = Math.max(minX, Math.min(pointerX, maxX));
-        const y = Math.max(minY, Math.min(pointerY, maxY));
+        let x = anchor.x;
+        let y = anchor.y + anchor.height + CARET_GAP;
+        if (anchor.centered)
+            x -= width / 2;
+        // Not enough room below the caret: open above it instead.
+        if (anchor.source === 'caret' && y > maxY)
+            y = anchor.y - height - CARET_GAP;
+
+        x = Math.max(minX, Math.min(x, maxX));
+        y = Math.max(minY, Math.min(y, maxY));
         this._box.set_position(Math.round(x), Math.round(y));
     }
 

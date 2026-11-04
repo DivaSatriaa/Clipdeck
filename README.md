@@ -7,7 +7,7 @@ Windows 11-style clipboard history for GNOME. Press **Super+V**, pick an item, a
 ## Features
 
 - Clipboard history for text, newest first, duplicates moved to the top
-- Popup opens next to the mouse pointer with **Super+V**
+- Popup opens at the text caret (or over the focused window) with **Super+V**
 - Click or press **Enter** to paste directly into the focused app
 - Terminal-aware paste (sends Ctrl+Shift+V in terminals)
 - Keyboard navigation: ↑ ↓ Home End, **Del** to remove an item, **Esc** to close
