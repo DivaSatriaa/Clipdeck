@@ -59,38 +59,53 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
 
 ## Installation
 
-### Option 1: `.deb` package (Ubuntu / Debian)
+### Option 1: Ubuntu via PPA (Recommended)
 
-Build the package from source, then install it with apt, which also pulls in the dependencies:
+The easiest way to install Clipdeck on Ubuntu 24.04 LTS:
 
 ```bash
-git clone https://github.com/divasatriaa/clipdeck.git
-cd clipdeck
-make deb
-sudo apt install --reinstall ./dist/clipdeck_0.2.0_all.deb
+sudo add-apt-repository ppa:divasatriaa/clipdeck
+sudo apt update
+sudo apt install clipdeck
 ```
 
-Then **log out and back in** (GNOME Shell only discovers new extensions at login), open **Clipdeck** from the app grid and switch on **Enable Clipdeck**.
+After installation, log out and log back in. Open **Clipdeck** from the app grid and enable it.
 
-> [!TIP]
-> `--reinstall` makes apt replace the files even when the version number has not changed, for example after pulling new commits.
+To receive future updates:
 
-To remove it:
+```bash
+sudo apt update
+sudo apt upgrade
+```
+
+To uninstall:
 
 ```bash
 sudo apt remove clipdeck
 ```
 
-### Option 2: From source (per user, no root)
+### Option 2: Build and install the `.deb` manually
+
+For Debian-based distributions or users who prefer installing from source:
 
 ```bash
-git clone https://github.com/divasatriaa/clipdeck.git
-cd clipdeck
+git clone https://github.com/DivaSatriaa/Clipdeck.git
+cd Clipdeck
+make deb
+sudo apt install ./dist/clipdeck_0.2.0_all.deb
+```
+
+### Option 3: Install from source (per user)
+
+```bash
+git clone https://github.com/DivaSatriaa/Clipdeck.git
+cd Clipdeck
 make install
 ```
 
-Then log out and back in, and open **Clipdeck** from the app grid. Remove it again with `make uninstall`.
+Log out and back in to load the extension. Remove it with `make uninstall`.
 
+**Note:** If both a source installation (`~/.local`) and a system-wide `.deb` installation exist, GNOME prioritizes the copy in your home directory. Run `make uninstall` before switching to the `.deb` package.
 > [!NOTE]
 > If you have both a source install (in `~/.local`) and the `.deb`, GNOME uses the copy in your home folder. Run `make uninstall` before switching to the package.
 
