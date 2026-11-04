@@ -2,13 +2,15 @@
 
 Windows 11-style clipboard history for GNOME. Press **Super+V**, pick an item, and it is pasted straight into the field you were typing in.
 
-> Status: early development (v0.1.0). History is kept in memory for now and is cleared when you log out.
+> Status: early development (v0.1.0). History is kept in memory for now and is cleared when you log out. Copied images are stored temporarily in `~/.cache/clipdeck/images`.
 
 ## Features
 
-- Clipboard history for text, newest first, duplicates moved to the top
+- Clipboard history for text and images (including **PrtScr** screenshots), newest first, duplicates moved to the top
 - Popup opens at the text caret (or over the focused window) with **Super+V**
-- Click or press **Enter** to paste directly into the focused app
+- Click an item (or press **Enter**) to paste directly into the focused app; scroll with the mouse wheel
+- Click anywhere outside the popup to close it
+- Smooth open/close animation
 - Terminal-aware paste (sends Ctrl+Shift+V in terminals)
 - Keyboard navigation: ↑ ↓ Home End, **Del** to remove an item, **Esc** to close
 - Skips entries that password managers mark as secret
@@ -78,7 +80,7 @@ dbus-run-session -- gnome-shell --nested --wayland
 - [x] Text history, popup, paste into focused app
 - [ ] Search and pinned items
 - [ ] Save history to disk
-- [ ] Image support
+- [x] Image support (screenshots, copied images)
 - [ ] Settings page (shortcut, history size, excluded apps)
 - [ ] Dark theme that follows the system
 - [ ] Publish on extensions.gnome.org
