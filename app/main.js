@@ -22,8 +22,14 @@ const ISSUES_URL = `${REPO_URL}/issues`;
 
 const APP_DIR = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
 
-// Settings widgets shared with the extension's prefs.js. Installed next to
-// this file; in a source checkout it lives in ../extension/.
+// Modules shared with the extension's prefs.js. Installed next to this
+// file; in a source checkout they live in ../extension/.
+function sharedModule(name) {
+    return GLib.file_test(GLib.build_filenamev([APP_DIR, name]), GLib.FileTest.EXISTS)
+        ? `./${name}`
+        : `../extension/${name}`;
+}
+
 const {
     accelLabel,
     createAppearanceGroup,
@@ -31,9 +37,8 @@ const {
     createShortcutRow,
     describeConflicts,
     trySettings,
-} = await import(GLib.file_test(GLib.build_filenamev([APP_DIR, 'settingsUi.js']), GLib.FileTest.EXISTS)
-    ? './settingsUi.js'
-    : '../extension/settingsUi.js');
+} = await import(sharedModule('settingsUi.js'));
+const {resolveAccent, shade} = await import(sharedModule('accent.js'));
 
 // GNOME Shell exports org.gnome.Shell.Extensions on this object path
 // (js/ui/shellDBus.js), not on /org/gnome/Shell/Extensions.
@@ -436,8 +441,14 @@ class ClipdeckApplication extends Adw.Application {
 
         this._settings = loadExtensionSettings();
         if (this._settings) {
+            this._accentProvider = new Gtk.CssProvider();
+            Gtk.StyleContext.add_provider_for_display(display, this._accentProvider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+
             this._applyTheme();
             this._settings.connect('changed::theme', () => this._applyTheme());
+            this._settings.connect('changed::accent-color', () => this._applyTheme());
+            Adw.StyleManager.get_default().connect('notify::dark', () => this._applyTheme());
         }
     }
 
@@ -453,8 +464,22 @@ class ClipdeckApplication extends Adw.Application {
             light: Adw.ColorScheme.FORCE_LIGHT,
             dark: Adw.ColorScheme.FORCE_DARK,
         };
-        Adw.StyleManager.get_default().color_scheme =
+        const styleManager = Adw.StyleManager.get_default();
+        styleManager.color_scheme =
             schemes[this._settings.get_string('theme')] ?? Adw.ColorScheme.DEFAULT;
+
+        // Preview the popup's accent colour in this window too. "Follow
+        // system" leaves libadwaita's own (system) accent alone.
+        const value = this._settings.get_string('accent-color');
+        let css = '';
+        if (value !== 'system') {
+            const bg = resolveAccent(value);
+            const fg = styleManager.dark ? shade(bg, 0.35) : shade(bg, -0.1);
+            css = Adw.get_minor_version() >= 6
+                ? `:root { --accent-bg-color: ${bg}; --accent-color: ${fg}; }`
+                : `@define-color accent_bg_color ${bg}; @define-color accent_color ${fg};`;
+        }
+        this._accentProvider.load_from_string(css);
     }
 
     _addAction(name, callback) {

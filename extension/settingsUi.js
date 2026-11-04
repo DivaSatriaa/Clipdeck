@@ -10,6 +10,8 @@ import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 
+import {ACCENT_PRESETS, describeAccent, isHexColor} from './accent.js';
+
 export const DEFAULT_SHORTCUT = '<Super>v';
 
 /* ------------------------------------------------------------------ */
@@ -252,6 +254,8 @@ export function createAppearanceGroup(settings, description) {
         settings.set_string('theme', themes[themeRow.selected]));
     group.add(themeRow);
 
+    group.add(createAccentRow(settings));
+
     const motionRow = new Adw.SwitchRow({
         title: 'Reduce animations',
         subtitle: 'Show and hide the popup instantly',
@@ -260,6 +264,178 @@ export function createAppearanceGroup(settings, description) {
     group.add(motionRow);
 
     return group;
+}
+
+/* ------------------------------------------------------------------ */
+/* Accent colour picker                                                */
+/* ------------------------------------------------------------------ */
+
+let swatchCssInstalled = false;
+
+function installSwatchCss() {
+    if (swatchCssInstalled)
+        return;
+    swatchCssInstalled = true;
+
+    const rules = ACCENT_PRESETS.map((preset, i) => preset.color
+        ? `.clipdeck-swatch-${i} { background: ${preset.color}; }`
+        : `.clipdeck-swatch-${i} { background: linear-gradient(135deg,
+             #3584e4 0%, #3a944a 33%, #ed5b00 66%, #d56199 100%); }`);
+    const css = `
+.clipdeck-swatch {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  color: white;
+  box-shadow: inset 0 0 0 1px alpha(black, 0.12);
+}
+.clipdeck-swatch:checked,
+.clipdeck-swatch.selected {
+  box-shadow: inset 0 0 0 1px alpha(black, 0.12), 0 0 0 2px @window_bg_color, 0 0 0 4px alpha(@window_fg_color, 0.55);
+}
+.clipdeck-swatch image { -gtk-icon-shadow: 0 1px 2px alpha(black, 0.4); }
+.clipdeck-swatch-custom {
+  background: alpha(@window_fg_color, 0.08);
+  color: @window_fg_color;
+}
+.clipdeck-swatch-custom image { -gtk-icon-shadow: none; }
+${rules.join('\n')}
+`;
+    const provider = new Gtk.CssProvider();
+    if (provider.load_from_string)
+        provider.load_from_string(css);
+    else
+        provider.load_from_data(css, -1);
+    Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+}
+
+function hexToRgba(hex) {
+    const rgba = new Gdk.RGBA();
+    rgba.parse(hex);
+    return rgba;
+}
+
+function rgbaToHex(rgba) {
+    const c = v => Math.round(v * 255).toString(16).padStart(2, '0');
+    return `#${c(rgba.red)}${c(rgba.green)}${c(rgba.blue)}`;
+}
+
+/**
+ * "Accent color" row: a swatch per preset (Clipdeck purple, follow system,
+ * GNOME's palette) plus a colour dialog for any custom colour.
+ */
+export function createAccentRow(settings) {
+    installSwatchCss();
+
+    const row = new Adw.PreferencesRow({activatable: false, focusable: false});
+    const box = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 10,
+        margin_top: 12,
+        margin_bottom: 12,
+        margin_start: 12,
+        margin_end: 12,
+    });
+    row.set_child(box);
+
+    const header = new Gtk.Box({spacing: 6});
+    header.append(new Gtk.Label({label: 'Accent color', xalign: 0, hexpand: true}));
+    const current = new Gtk.Label({css_classes: ['dim-label'], xalign: 1});
+    header.append(current);
+    box.append(header);
+
+    const swatches = new Gtk.FlowBox({
+        selection_mode: Gtk.SelectionMode.NONE,
+        max_children_per_line: 11,
+        min_children_per_line: 4,
+        column_spacing: 4,
+        row_spacing: 6,
+        homogeneous: true,
+    });
+    box.append(swatches);
+
+    let syncing = false;
+    const buttons = [];
+    let group = null;
+    ACCENT_PRESETS.forEach((preset, i) => {
+        const button = new Gtk.ToggleButton({
+            css_classes: ['clipdeck-swatch', `clipdeck-swatch-${i}`],
+            tooltip_text: preset.name,
+            halign: Gtk.Align.CENTER,
+            valign: Gtk.Align.CENTER,
+        });
+        button.update_property([Gtk.AccessibleProperty.LABEL], [preset.name]);
+        const check = new Gtk.Image({icon_name: 'object-select-symbolic', visible: false});
+        button.set_child(check);
+        if (group)
+            button.set_group(group);
+        else
+            group = button;
+        button.connect('toggled', () => {
+            check.visible = button.active;
+            if (button.active && !syncing)
+                settings.set_string('accent-color', preset.id);
+        });
+        swatches.append(button);
+        buttons.push(button);
+    });
+
+    // Custom colour: a "+" swatch that opens the colour dialog and then
+    // shows the chosen colour itself.
+    const custom = new Gtk.Button({
+        css_classes: ['clipdeck-swatch', 'clipdeck-swatch-custom'],
+        tooltip_text: 'Custom color…',
+        halign: Gtk.Align.CENTER,
+        valign: Gtk.Align.CENTER,
+        child: new Gtk.Image({icon_name: 'list-add-symbolic'}),
+    });
+    custom.update_property([Gtk.AccessibleProperty.LABEL], ['Custom color']);
+    const customCss = new Gtk.CssProvider();
+    custom.get_style_context().add_provider(customCss, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
+    const dialog = new Gtk.ColorDialog({title: 'Custom Accent Color', with_alpha: false});
+    custom.connect('clicked', () => {
+        const value = settings.get_string('accent-color');
+        const initial = hexToRgba(isHexColor(value) ? value : '#71388a');
+        dialog.choose_rgba(custom.get_root(), initial, null, (_d, result) => {
+            try {
+                settings.set_string('accent-color', rgbaToHex(dialog.choose_rgba_finish(result)));
+            } catch {
+                // Dialog cancelled.
+            }
+        });
+    });
+    swatches.append(custom);
+
+    const sync = () => {
+        const value = settings.get_string('accent-color');
+        syncing = true;
+        const index = ACCENT_PRESETS.findIndex(p => p.id === value.toLowerCase());
+        buttons.forEach((b, i) => {
+            b.active = i === index;
+        });
+        const isCustom = index < 0 && isHexColor(value);
+        const css = isCustom
+            ? `.clipdeck-swatch-custom { background: ${value}; color: white; }`
+            : '';
+        if (customCss.load_from_string)
+            customCss.load_from_string(css);
+        else
+            customCss.load_from_data(css, -1);
+        custom.child.icon_name = isCustom ? 'object-select-symbolic' : 'list-add-symbolic';
+        if (isCustom)
+            custom.add_css_class('selected');
+        else
+            custom.remove_css_class('selected');
+        current.label = describeAccent(value);
+        syncing = false;
+    };
+    const id = settings.connect('changed::accent-color', sync);
+    row.connect('destroy', () => settings.disconnect(id));
+    sync();
+
+    return row;
 }
 
 export function createClipboardGroup(settings) {

@@ -42,7 +42,7 @@ Before each upload:
    unzip -l dist/clipdeck@divasatriaa.github.io.shell-extension.zip
    ```
 
-   It should contain `extension.js`, `prefs.js`, `settingsUi.js`, `stylesheet.css`, `metadata.json` and `schemas/`.
+   It should contain `extension.js`, `prefs.js`, `settingsUi.js`, `accent.js`, `stylesheet.css`, `metadata.json` and `schemas/`.
 
 3. Upload the zip at <https://extensions.gnome.org/upload/>.
 4. Wait for the review, which can take from a few days to a few weeks. If the reviewer asks for changes, fix them, bump `version-name` and upload again.

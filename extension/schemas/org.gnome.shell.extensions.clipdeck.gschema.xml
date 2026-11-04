@@ -16,6 +16,11 @@
       <summary>Popup theme</summary>
       <description>"system" follows the GNOME light/dark style; "light" and "dark" force one.</description>
     </key>
+    <key name="accent-color" type="s">
+      <default>'clipdeck'</default>
+      <summary>Accent color</summary>
+      <description>"clipdeck" for the Clipdeck purple, "system" to follow the GNOME accent color (GNOME 47+), or a custom color as "#rrggbb".</description>
+    </key>
     <key name="reduce-motion" type="b">
       <default>false</default>
       <summary>Reduce animations</summary>

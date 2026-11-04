@@ -19,8 +19,8 @@ LOCAL_APP  := $(LOCAL_DATA)/clipdeck
 
 ICON_SIZES := 16 24 32 48 64 128 256 512
 EXT_FILES  := extension/metadata.json extension/extension.js extension/prefs.js \
-              extension/settingsUi.js extension/stylesheet.css
-APP_FILES  := app/main.js extension/settingsUi.js assets/logo.png
+              extension/settingsUi.js extension/accent.js extension/stylesheet.css
+APP_FILES  := app/main.js extension/settingsUi.js extension/accent.js assets/logo.png
 
 .PHONY: all help pack install install-extension install-app uninstall enable disable \
         schemas run-app install-system deb ppa-source logs clean
@@ -43,7 +43,7 @@ help:
 # extension.js, prefs.js, metadata.json, stylesheet.css and schemas/ itself.
 pack:
 	mkdir -p $(DIST)
-	gnome-extensions pack --force --out-dir=$(DIST) --extra-source=settingsUi.js extension
+	gnome-extensions pack --force --out-dir=$(DIST) --extra-source=settingsUi.js --extra-source=accent.js extension
 
 install-extension: pack
 	gnome-extensions install --force $(ZIP)
