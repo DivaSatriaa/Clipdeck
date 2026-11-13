@@ -23,4 +23,5 @@ Description: Windows-style clipboard history for GNOME
  .
  This package contains the GNOME Shell extension and the Clipdeck settings
  app, which turns the extension on and off and configures its shortcut,
- theme, animations and screenshot support.
+ theme, animations and screenshot support, and clipdeck-bridge, which sends
+ new items to the Clipdeck Android app over Bluetooth.

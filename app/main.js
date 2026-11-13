@@ -44,6 +44,11 @@ const {
 } = await import(sharedModule('settingsUi.js'));
 const {resolveAccent, shade} = await import(sharedModule('accent.js'));
 
+// clipdeck-bridge: the Bluetooth helper for the Android app.
+const BRIDGE_BUS_NAME = 'io.github.divasatriaa.Clipdeck.Bridge';
+const BRIDGE_PATH = '/io/github/divasatriaa/Clipdeck/Bridge';
+const BRIDGE_IFACE = 'io.github.divasatriaa.Clipdeck.Bridge1';
+
 // GNOME Shell exports org.gnome.Shell.Extensions on this object path
 // (js/ui/shellDBus.js), not on /org/gnome/Shell/Extensions.
 const SHELL_BUS_NAME = 'org.gnome.Shell';
@@ -76,6 +81,7 @@ const ExtensionState = {
 // an older Clipdeck install.
 const REQUIRED_KEYS = [
     'toggle-popup', 'theme', 'accent-color', 'reduce-motion', 'enable-images', 'history-size',
+    'phone-sync', 'phone-sync-images',
 ];
 
 /**
@@ -233,6 +239,7 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
             ['General', () => this._buildGeneralGroup()],
             ['Appearance', () => createAppearanceGroup(settings, 'Applies to the popup and to this window')],
             ['Clipboard', () => createClipboardGroup(settings)],
+            ['Phone', () => this._buildPhoneGroup()],
             ['Project', () => this._buildAboutGroup()],
         ];
         for (const [name, build] of sections) {
@@ -259,6 +266,8 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
         });
         this.connect('close-request', () => {
             this._shell.destroy();
+            if (this._bridgeWatch)
+                Gio.bus_unwatch_name(this._bridgeWatch);
             this._settingsIds?.forEach(id => this._settings.disconnect(id));
             return false;
         });
@@ -336,6 +345,130 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
         }));
 
         return group;
+    }
+
+    _buildPhoneGroup() {
+        const group = new Adw.PreferencesGroup({
+            title: 'Phone',
+            description: 'Send what you copy on this computer to the Clipdeck app on your Android phone, over Bluetooth.',
+        });
+        if (!this._settings.settings_schema.has_key('phone-sync'))
+            throw new Error('this Clipdeck installation has no phone support (outdated settings schema)');
+
+        const syncRow = new Adw.SwitchRow({
+            title: 'Send copies to my phone',
+            subtitle: 'Copied text and screenshots appear on your phone and in its clipboard',
+        });
+        this._settings.bind('phone-sync', syncRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        group.add(syncRow);
+
+        const imagesRow = new Adw.SwitchRow({
+            title: 'Include screenshots and images',
+            subtitle: 'Images are saved to Pictures/Clipdeck on the phone',
+        });
+        this._settings.bind('phone-sync-images', imagesRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        this._settings.bind('phone-sync', imagesRow, 'sensitive', Gio.SettingsBindFlags.GET);
+        group.add(imagesRow);
+
+        this._phoneStatusRow = new Adw.ActionRow({title: 'Status'});
+        this._phoneStatusIcon = new Gtk.Image({icon_name: 'phone-symbolic'});
+        this._phoneStatusRow.add_prefix(this._phoneStatusIcon);
+        group.add(this._phoneStatusRow);
+
+        const help = new Adw.ExpanderRow({
+            title: 'How to connect your phone',
+            subtitle: 'Pair once, then it reconnects by itself',
+        });
+        [
+            '1. Pair your phone with this computer in Settings → Bluetooth.',
+            '2. Install Clipdeck for Android on the phone.',
+            '3. Open it, choose this computer and tap Connect.',
+        ].forEach(step => help.add_row(new Adw.ActionRow({title: step, title_lines: 2})));
+        group.add(help);
+
+        // The bridge is D-Bus activated; follow it for the status line.
+        this._bridgeError = '';
+        this._bridgeWatch = Gio.bus_watch_name(Gio.BusType.SESSION, BRIDGE_BUS_NAME,
+            Gio.BusNameWatcherFlags.NONE,
+            () => this._connectBridgeProxy(),
+            () => {
+                this._bridgeProxy = null;
+                this._syncPhoneStatus();
+            });
+        this._settings.connect('changed::phone-sync', () => {
+            this._bridgeError = '';
+            if (this._settings.get_boolean('phone-sync'))
+                this._startBridge();
+            this._syncPhoneStatus();
+        });
+        if (this._settings.get_boolean('phone-sync'))
+            this._startBridge();
+        this._syncPhoneStatus();
+        return group;
+    }
+
+    _startBridge() {
+        Gio.DBus.session.call('org.freedesktop.DBus', '/org/freedesktop/DBus',
+            'org.freedesktop.DBus', 'StartServiceByName',
+            new GLib.Variant('(su)', [BRIDGE_BUS_NAME, 0]), null,
+            Gio.DBusCallFlags.NONE, -1, null, (connection, result) => {
+                try {
+                    connection.call_finish(result);
+                } catch (e) {
+                    console.warn(`Clipdeck: cannot start the phone bridge: ${e.message}`);
+                    this._bridgeError = 'The phone helper (clipdeck-bridge) is not installed. ' +
+                        'Install Clipdeck with the .deb package or make install.';
+                    this._syncPhoneStatus();
+                }
+            });
+    }
+
+    _connectBridgeProxy() {
+        Gio.DBusProxy.new_for_bus(Gio.BusType.SESSION, Gio.DBusProxyFlags.NONE, null,
+            BRIDGE_BUS_NAME, BRIDGE_PATH, BRIDGE_IFACE, null, (_o, result) => {
+                try {
+                    this._bridgeProxy = Gio.DBusProxy.new_for_bus_finish(result);
+                    this._bridgeProxy.connect('g-properties-changed', () => this._syncPhoneStatus());
+                } catch (e) {
+                    console.warn(`Clipdeck: cannot talk to the phone bridge: ${e.message}`);
+                }
+                this._syncPhoneStatus();
+            });
+    }
+
+    _syncPhoneStatus() {
+        if (!this._phoneStatusRow)
+            return;
+        const prop = name => this._bridgeProxy?.get_cached_property(name)?.unpack() ?? '';
+        const status = prop('Status');
+
+        let text, icon = 'phone-symbolic', css = 'dim-label';
+        if (!this._settings.get_boolean('phone-sync')) {
+            text = 'Off';
+        } else if (this._bridgeError) {
+            text = this._bridgeError;
+            icon = 'dialog-warning-symbolic';
+            css = 'warning';
+        } else if (status === 'connected') {
+            text = `Connected to ${prop('DeviceName') || 'your phone'}`;
+            icon = 'emblem-ok-symbolic';
+            css = 'success';
+        } else if (status === 'waiting') {
+            text = 'Waiting for your phone. Open Clipdeck on Android and tap Connect.';
+        } else if (status === 'no-bluetooth') {
+            text = 'Bluetooth is off or not available on this computer.';
+            icon = 'bluetooth-disabled-symbolic';
+            css = 'warning';
+        } else if (status === 'error') {
+            text = `Bluetooth error: ${prop('LastError')}`;
+            icon = 'dialog-warning-symbolic';
+            css = 'error';
+        } else {
+            text = 'Starting…';
+        }
+        this._phoneStatusRow.subtitle = GLib.markup_escape_text(text, -1);
+        this._phoneStatusIcon.icon_name = icon;
+        this._phoneStatusIcon.css_classes = [css];
     }
 
     _buildAboutGroup() {

@@ -23,10 +23,13 @@ ICON_SIZES := 16 24 32 48 64 128 256 512
 ICON_FILE  := icons/hicolor/256x256/apps/$(APP_ID).png
 EXT_FILES  := extension/metadata.json extension/extension.js extension/prefs.js \
               extension/settingsUi.js extension/accent.js extension/stylesheet.css
-APP_FILES  := app/main.js extension/settingsUi.js extension/accent.js assets/logo.png
+APP_FILES  := app/main.js extension/settingsUi.js extension/accent.js assets/logo.png \
+              bridge/bridge.js
+# D-Bus activation file of clipdeck-bridge (Bluetooth helper for the Android app)
+BRIDGE_SVC := io.github.divasatriaa.Clipdeck.Bridge.service
 
 .PHONY: all help pack install install-extension install-app uninstall enable disable \
-        schemas run-app install-system deb ppa-source logs clean
+        schemas run-app install-system deb ppa-source android logs clean
 
 all: pack
 
@@ -39,6 +42,7 @@ help:
 	@echo "make run-app         Run the settings app from this folder"
 	@echo "make enable/disable  Turn the extension on or off"
 	@echo "make logs            Follow GNOME Shell logs"
+	@echo "make android         Build the Android app (needs the Android SDK)"
 
 ## ---------------------------------------------------------------- extension
 
@@ -76,6 +80,8 @@ install-app:
 		install -Dm644 data/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png \
 			$(LOCAL_DATA)/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png; \
 	done
+	install -d $(LOCAL_DATA)/dbus-1/services
+	sed 's|@APPDIR@|$(LOCAL_APP)|' data/$(BRIDGE_SVC).in > $(LOCAL_DATA)/dbus-1/services/$(BRIDGE_SVC)
 	-gtk-update-icon-cache -q -t $(LOCAL_DATA)/icons/hicolor 2>/dev/null
 	-update-desktop-database -q $(LOCAL_DATA)/applications 2>/dev/null
 
@@ -89,6 +95,7 @@ uninstall:
 	-gnome-extensions uninstall $(UUID)
 	rm -rf $(LOCAL_APP)
 	rm -f $(LOCAL_BIN)/clipdeck $(LOCAL_DATA)/applications/$(APP_ID).desktop
+	rm -f $(LOCAL_DATA)/dbus-1/services/$(BRIDGE_SVC)
 	rm -f $(foreach s,$(ICON_SIZES),$(LOCAL_DATA)/icons/hicolor/$(s)x$(s)/apps/$(APP_ID).png)
 
 ## ------------------------------------------------------- system / packages
@@ -107,6 +114,8 @@ install-system:
 	sed -e 's|@BINDIR@|$(PREFIX)/bin|' -e 's|@ICON@|$(PREFIX)/share/$(ICON_FILE)|' \
 		data/$(APP_ID).desktop.in > $(SHARE)/applications/$(APP_ID).desktop
 	install -m644 data/$(APP_ID).metainfo.xml $(SHARE)/metainfo/
+	install -d $(SHARE)/dbus-1/services
+	sed 's|@APPDIR@|$(PREFIX)/share/clipdeck|' data/$(BRIDGE_SVC).in > $(SHARE)/dbus-1/services/$(BRIDGE_SVC)
 	for size in $(ICON_SIZES); do \
 		install -Dm644 data/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png \
 			$(SHARE)/icons/hicolor/$${size}x$${size}/apps/$(APP_ID).png; \
@@ -129,6 +138,14 @@ deb:
 # Signed source package for Launchpad (see docs/PUBLISHING.md).
 ppa-source:
 	debuild -S -sa -d
+
+## ------------------------------------------------------------------ android
+
+# Needs the Android SDK (ANDROID_HOME, or sdk.dir in android/local.properties).
+android:
+	cd android && ./gradlew assembleRelease
+	@echo
+	@echo "APK: android/app/build/outputs/apk/release/app-release.apk"
 
 ## -------------------------------------------------------------------- misc
 

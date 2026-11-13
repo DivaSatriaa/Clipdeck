@@ -37,5 +37,15 @@
       <summary>History size</summary>
       <description>Maximum number of items kept in the history.</description>
     </key>
+    <key name="phone-sync" type="b">
+      <default>false</default>
+      <summary>Send copies to your phone</summary>
+      <description>Send new clipboard items to the Clipdeck Android app over Bluetooth, through the clipdeck-bridge helper.</description>
+    </key>
+    <key name="phone-sync-images" type="b">
+      <default>true</default>
+      <summary>Send screenshots and images to your phone</summary>
+      <description>When phone sync is on, also send copied images and screenshots, not only text.</description>
+    </key>
   </schema>
 </schemalist>

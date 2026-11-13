@@ -46,6 +46,21 @@ const TEXT_MIMES = ['text/plain', 'text/plain;charset=utf-8', 'UTF8_STRING', 'ST
 // Preferred image formats, best first. GNOME screenshots use image/png.
 const IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/webp', 'image/bmp', 'image/gif'];
 
+// Session-bus interface the phone bridge (clipdeck-bridge) listens to.
+const DBUS_PATH = '/io/github/divasatriaa/Clipdeck';
+const DBUS_IFACE_XML = `
+<node>
+  <interface name="io.github.divasatriaa.Clipdeck1">
+    <signal name="ItemAdded">
+      <arg name="kind" type="s"/>
+      <arg name="text" type="s"/>
+      <arg name="path" type="s"/>
+      <arg name="mime" type="s"/>
+    </signal>
+  </interface>
+</node>`;
+const BRIDGE_BUS_NAME = 'io.github.divasatriaa.Clipdeck.Bridge';
+
 // Password managers (KeePassXC, etc.) tag secrets with this MIME type.
 const PASSWORD_HINT_MIME = 'x-kde-passwordManagerHint';
 
@@ -595,6 +610,14 @@ export default class ClipdeckExtension extends Extension {
         this._accentHex = null;
         this._applyAccent();
 
+        // Tell the phone bridge about new items. It is a separate,
+        // D-Bus-activated process (it owns the Bluetooth connection).
+        this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(DBUS_IFACE_XML, {});
+        this._dbusImpl.export(Gio.DBus.session, DBUS_PATH);
+        this._settingsChangedIds.push(
+            this._settings.connect('changed::phone-sync', () => this._startBridge()));
+        this._startBridge();
+
         this._popup = new ClipboardPopup(this);
 
         const action = Main.wm.addKeybinding(
@@ -633,6 +656,9 @@ export default class ClipdeckExtension extends Extension {
         this._unloadAccent();
         this._themeContext = null;
         this._accentDir = null;
+
+        this._dbusImpl?.unexport();
+        this._dbusImpl = null;
 
         this._popup?.close({animate: false});
         this._popup = null;
@@ -810,6 +836,44 @@ export default class ClipdeckExtension extends Extension {
         this._trimHistory();
 
         this._popup?.refresh();
+        this._announce(entry);
+    }
+
+    /** Emit ItemAdded for the phone bridge when phone sync is on. */
+    _announce(entry) {
+        if (!this._dbusImpl || !this._hasKey('phone-sync') || !this._settings.get_boolean('phone-sync'))
+            return;
+        const isImage = entry.type === 'image';
+        if (isImage && !this._settings.get_boolean('phone-sync-images'))
+            return;
+        this._dbusImpl.emit_signal('ItemAdded', new GLib.Variant('(ssss)', [
+            isImage ? 'image' : 'text',
+            isImage ? '' : entry.text,
+            isImage ? entry.path : '',
+            isImage ? entry.mime : 'text/plain',
+        ]));
+    }
+
+    /** Start clipdeck-bridge through D-Bus activation when phone sync is on. */
+    _startBridge() {
+        if (!this._hasKey('phone-sync') || !this._settings.get_boolean('phone-sync'))
+            return;
+        Gio.DBus.session.call('org.freedesktop.DBus', '/org/freedesktop/DBus',
+            'org.freedesktop.DBus', 'StartServiceByName',
+            new GLib.Variant('(su)', [BRIDGE_BUS_NAME, 0]), null,
+            Gio.DBusCallFlags.NONE, -1, null, (connection, result) => {
+                try {
+                    connection.call_finish(result);
+                } catch (e) {
+                    // Not installed (for example the extensions.gnome.org
+                    // build): phone sync is simply unavailable.
+                    console.warn(`[Clipdeck] phone bridge not available: ${e.message}`);
+                }
+            });
+    }
+
+    _hasKey(key) {
+        return this._settings?.settings_schema.has_key(key) ?? false;
     }
 
     _trimHistory() {

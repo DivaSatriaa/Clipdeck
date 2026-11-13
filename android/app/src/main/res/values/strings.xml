@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Clipdeck</string>
+    <string name="tagline">Copies from your computer, on your phone</string>
+
+    <string name="status_off">Not connected</string>
+    <string name="status_connecting">Connecting to %1$s…</string>
+    <string name="status_connected">Connected to %1$s</string>
+    <string name="status_connected_detail">Text and screenshots you copy on the computer land in this phone\'s clipboard.</string>
+    <string name="status_retrying">Waiting for the computer…</string>
+    <string name="status_no_permission">Bluetooth permission is missing.</string>
+    <string name="status_no_bluetooth">This phone has no Bluetooth.</string>
+    <string name="status_bluetooth_off">Bluetooth is off.</string>
+    <string name="status_cannot_reach">Cannot reach the computer. Is “Send copies to my phone” on in Clipdeck?</string>
+    <string name="status_closed_by_computer">The computer closed the connection.</string>
+
+    <string name="permission_title">Allow Bluetooth</string>
+    <string name="permission_body">Clipdeck needs the Nearby devices permission to talk to your computer, and notifications to stay connected in the background.</string>
+    <string name="permission_action">Allow</string>
+
+    <string name="computer_title">Computer</string>
+    <string name="computer_hint">Pick the computer running Clipdeck. It must be paired with this phone first.</string>
+    <string name="computer_none">No paired devices yet. Tap “Pair a computer”.</string>
+    <string name="computer_not_a_computer">Not a computer?</string>
+    <string name="action_connect">Connect</string>
+    <string name="action_disconnect">Disconnect</string>
+    <string name="action_pair">Pair a computer</string>
+
+    <string name="recent_title">Received</string>
+    <string name="recent_empty">Nothing yet. Copy something on your computer.</string>
+    <string name="tap_to_copy">tap to copy again</string>
+    <string name="clip_label_text">Text from computer</string>
+    <string name="clip_label_image">Image from computer</string>
+
+    <string name="notification_channel">Connection</string>
+    <string name="notification_connecting">Connecting…</string>
+    <string name="notification_connected">Connected to %1$s</string>
+    <string name="notification_retrying">Waiting for the computer…</string>
+</resources>

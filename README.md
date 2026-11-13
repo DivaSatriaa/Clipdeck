@@ -11,7 +11,7 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
 [![Wayland & X11](https://img.shields.io/badge/Wayland%20%26%20X11-supported-71388A)](#how-it-works)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-F37A20)](LICENSE)
 
-[Install](#installation) · [Usage](#usage) · [Settings app](#settings-app) · [Troubleshooting](#troubleshooting) · [Development](#development)
+[Install](#installation) · [Usage](#usage) · [Settings app](#settings-app) · [Android app](#android-app) · [Troubleshooting](#troubleshooting) · [Development](#development)
 
 </div>
 
@@ -28,6 +28,7 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
 - **Your color.** Keep the Clipdeck purple, follow the GNOME accent color, pick one of the GNOME palette colors, or choose any custom color.
 - **Smooth, or not.** Short open and close animations, with a *Reduce animations* switch for people who prefer none.
 - **Respects secrets.** Entries that password managers mark as secret are never stored.
+- **On your phone too.** With the Clipdeck Android app, everything you copy and every screenshot you take on the computer lands in your phone's clipboard over Bluetooth.
 - **Settings app.** Turn Clipdeck on or off, change the shortcut, and detect and fix shortcut conflicts. The same settings are also available in the GNOME **Extensions** app.
 
 ## Screenshots
@@ -135,6 +136,8 @@ The **Clipdeck** app in your app grid controls the extension. The same settings 
 | **Reduce animations** | Shows and hides the popup instantly |
 | **Screenshots and images** | Whether copied images and screenshots are kept |
 | **History size** | How many items are kept (10–200) |
+| **Send copies to my phone** | Sends new items to the [Android app](#android-app) over Bluetooth, with a live connection status |
+| **Include screenshots and images** | Whether images are sent to the phone as well, or only text |
 
 When another GNOME shortcut already uses the same keys, for example the notification list or a custom shortcut left over from another clipboard manager, the app shows a banner naming it. Clicking **Free Shortcut** removes the key combination from those shortcuts.
 
@@ -144,7 +147,52 @@ All settings are also available from the command line:
 gsettings list-recursively org.gnome.shell.extensions.clipdeck
 ```
 
+## Android app
+
+The Clipdeck Android app puts whatever you copy on the computer, text and screenshots, straight into your phone's clipboard.
+
+- **Text** goes to the phone's clipboard, ready to paste.
+- **Screenshots and images** are saved to *Pictures/Clipdeck* and put on the clipboard as well.
+- The app keeps a list of what it received; tap an item to copy it again.
+- It stays connected in the background (with a small notification) and reconnects by itself.
+
+Copies go one way: from the computer to the phone. The connection uses Bluetooth only, with no internet and no account, and only devices paired with the computer can connect.
+
+### Requirements
+
+- Android 10 or newer, with Bluetooth
+- Clipdeck installed on the computer from the PPA, the `.deb` or `make install`. The phone connection needs the `clipdeck-bridge` helper, which is not part of the extensions.gnome.org version.
+
+### Setup
+
+1. **Build the APK** (needs the Android SDK, or open the `android/` folder in Android Studio):
+
+   ```bash
+   make android
+   ```
+
+   The APK is written to `android/app/build/outputs/apk/release/app-release.apk`. Copy it to the phone and open it to install. Android asks you to allow installs from that source once.
+
+2. **Pair the phone with the computer** in the computer's *Settings → Bluetooth*. Pairing is needed only once.
+3. **On the computer**, open the Clipdeck app and turn on **Send copies to my phone**.
+4. **On the phone**, open Clipdeck, allow *Nearby devices* and notifications, choose the computer and tap **Connect**.
+
+The status in the computer's Clipdeck app changes to **Connected to *your phone***. From then on, every copy and screenshot appears on the phone.
+
 ## Troubleshooting
+
+<details>
+<summary><b>The phone does not connect</b></summary>
+
+- Check that **Send copies to my phone** is on in the Clipdeck app on the computer, and that its status says *Waiting for your phone*.
+- Make sure Bluetooth is on and the two devices are paired. Unpair and pair again if the phone was paired before Clipdeck was installed.
+- Follow the helper's log on the computer while you tap **Connect**:
+
+  ```bash
+  journalctl --user -f | grep -i clipdeck-bridge
+  ```
+
+</details>
 
 <details>
 <summary><b>Pressing Super + V does nothing</b></summary>
@@ -212,6 +260,8 @@ Clipdeck runs as a GNOME Shell extension instead. Inside the shell it can listen
 
  Clipdeck app ──► GSettings (theme, shortcut, …) ──► extension
               └─► org.gnome.Shell.Extensions (D-Bus) ──► enable / disable
+
+ extension ──ItemAdded (D-Bus)──► clipdeck-bridge ──Bluetooth RFCOMM──► Android app
 ```
 
 ## Development
@@ -221,10 +271,12 @@ extension/   GNOME Shell extension: extension.js, prefs.js, stylesheet.css,
              metadata.json, schemas/, plus modules shared with the app:
              settingsUi.js (settings widgets) and accent.js (accent colors)
 app/         Settings app (GJS + GTK 4 + libadwaita) and its launcher
+bridge/      clipdeck-bridge: Bluetooth helper for the Android app (D-Bus activated)
+android/     Clipdeck for Android (Kotlin, Jetpack Compose)
 data/        Desktop entry, AppStream metadata, icons
 debian/      Source package for Launchpad PPAs (dpkg-buildpackage / debuild)
 packaging/   Control file for the quick `make deb` build
-docs/        Screenshots and the publishing guide
+docs/        Screenshots, the publishing guide and the phone protocol
 assets/      Logo
 ```
 
@@ -238,6 +290,7 @@ assets/      Logo
 | `make ppa-source` | Build a signed source package for a Launchpad PPA |
 | `make enable` / `make disable` | Turn the extension on or off |
 | `make logs` | Follow GNOME Shell logs |
+| `make android` | Build the Android app (needs the Android SDK) |
 
 After changing the extension on Wayland, run `make install` and log out and back in. To test without logging out, run a nested shell in a window:
 
