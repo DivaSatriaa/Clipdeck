@@ -6,7 +6,7 @@ How `clipdeck-bridge` (on the computer) talks to the Clipdeck Android app.
 
 - **Bluetooth Classic, RFCOMM.** The phone connects to the computer.
 - **Service UUID:** `0a1a0290-5d48-4328-92d4-cdb628a6acb9`.
-  - On the computer, `clipdeck-bridge` registers this UUID with BlueZ (`org.bluez.ProfileManager1.RegisterProfile`, role `server`).
+  - On the computer, `clipdeck-bridge` registers this UUID with BlueZ (`org.bluez.ProfileManager1.RegisterProfile`, role `server`, `Channel` 0). BlueZ only opens an RFCOMM listener for a custom UUID when `Channel` is given; 0 lets it pick a free channel.
   - On Android, the app connects with `BluetoothDevice.createRfcommSocketToServiceRecord(uuid)`.
 - **Pairing is required.** The profile is registered with `RequireAuthentication = true`, so BlueZ only hands over connections from bonded (paired) devices, and the link is encrypted by Bluetooth itself.
 

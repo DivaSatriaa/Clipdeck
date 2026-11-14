@@ -367,6 +367,10 @@ class Bridge {
         const options = {
             Name: new GLib.Variant('s', 'Clipdeck'),
             Role: new GLib.Variant('s', 'server'),
+            // Required: for a custom UUID, BlueZ only opens an RFCOMM listener
+            // when Channel is given (0 = pick a free channel). Without it the
+            // UUID is advertised but nothing accepts the phone's connection.
+            Channel: new GLib.Variant('q', 0),
             RequireAuthentication: new GLib.Variant('b', true),
             RequireAuthorization: new GLib.Variant('b', false),
             AutoConnect: new GLib.Variant('b', false),
