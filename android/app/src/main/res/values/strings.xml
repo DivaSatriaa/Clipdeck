@@ -9,6 +9,7 @@
     <string name="status_connected_detail">Text and screenshots you copy on the computer land in this phone\'s clipboard.</string>
     <string name="status_retrying">Waiting for the computer…</string>
     <string name="status_no_permission">Bluetooth permission is missing.</string>
+    <string name="status_security_error">Android blocked the connection: %1$s</string>
     <string name="status_no_bluetooth">This phone has no Bluetooth.</string>
     <string name="status_bluetooth_off">Bluetooth is off.</string>
     <string name="status_cannot_reach">Cannot reach the computer. Is “Send copies to my phone” on in Clipdeck?</string>

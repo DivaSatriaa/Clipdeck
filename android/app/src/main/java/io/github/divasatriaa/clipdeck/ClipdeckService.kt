@@ -124,7 +124,13 @@ class ClipdeckService : Service() {
                 runConnection(address)
                 backoffMs = 2_000L
             } catch (e: SecurityException) {
-                ClipStore.setLink(ClipStore.Link(ClipStore.Status.RETRYING, message = getString(R.string.status_no_permission)))
+                // Show the real reason; a generic "permission missing" hid this once.
+                val message = if (e.message?.contains("BLUETOOTH_CONNECT") == true) {
+                    getString(R.string.status_no_permission)
+                } else {
+                    getString(R.string.status_security_error, e.message ?: "")
+                }
+                ClipStore.setLink(ClipStore.Link(ClipStore.Status.RETRYING, message = message))
             } catch (e: IOException) {
                 if (!currentCoroutineContext().isActive) return
                 val message = when (e) {
@@ -157,7 +163,9 @@ class ClipdeckService : Service() {
 
         val s = device.createRfcommSocketToServiceRecord(Protocol.SERVICE_UUID)
         socket = s
-        adapter.cancelDiscovery()
+        // No cancelDiscovery() here: the app never scans for devices, and on
+        // Android 12+ that call needs the extra BLUETOOTH_SCAN permission,
+        // which made every connection attempt fail with SecurityException.
         s.connect()
 
         val input = BufferedInputStream(s.inputStream, 64 * 1024)
