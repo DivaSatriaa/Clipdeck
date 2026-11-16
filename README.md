@@ -11,6 +11,8 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
 [![Wayland & X11](https://img.shields.io/badge/Wayland%20%26%20X11-supported-71388A)](#how-it-works)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-F37A20)](LICENSE)
 
+<a href="https://ko-fi.com/divasatria"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Buy me a coffee on Ko-fi"></a>
+
 [Install](#installation) · [Usage](#usage) · [Settings app](#settings-app) · [Troubleshooting](#troubleshooting) · [Development](#development)
 
 </div>
