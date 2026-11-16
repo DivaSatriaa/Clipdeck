@@ -62,32 +62,7 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
 
 ## Installation
 
-### Option 1: Ubuntu via PPA (Recommended)
-
-The easiest way to install Clipdeck on Ubuntu 24.04 LTS:
-
-```bash
-sudo add-apt-repository ppa:divasatriaa/clipdeck
-sudo apt update
-sudo apt install clipdeck
-```
-
-After installation, log out and log back in. Open **Clipdeck** from the app grid and enable it.
-
-To receive future updates:
-
-```bash
-sudo apt update
-sudo apt upgrade
-```
-
-To uninstall:
-
-```bash
-sudo apt remove clipdeck
-```
-
-### Option 2: Build and install the `.deb` manually
+### Option 1: Build and install the `.deb` manually
 
 For Debian-based distributions or users who prefer installing from source:
 
@@ -98,7 +73,7 @@ make deb
 sudo apt install ./dist/clipdeck_0.2.0_all.deb
 ```
 
-### Option 3: Install from source (per user)
+### Option 2: Install from source (per user)
 
 ```bash
 git clone https://github.com/DivaSatriaa/Clipdeck.git
