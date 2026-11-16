@@ -11,6 +11,8 @@ Press <kbd>Super</kbd> + <kbd>V</kbd>, pick anything you copied (text or screens
 [![Wayland & X11](https://img.shields.io/badge/Wayland%20%26%20X11-supported-71388A)](#how-it-works)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-F37A20)](LICENSE)
 
+<a href="https://ko-fi.com/divasatria"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Buy me a coffee on Ko-fi"></a>
+
 [Install](#installation) · [Usage](#usage) · [Settings app](#settings-app) · [Android app](#android-app) · [Troubleshooting](#troubleshooting) · [Development](#development)
 
 </div>
@@ -165,13 +167,15 @@ Copies go one way: from the computer to the phone. The connection uses Bluetooth
 
 ### Setup
 
-1. **Build the APK** (needs the Android SDK, or open the `android/` folder in Android Studio):
+1. **Get the APK.** Download `clipdeck.apk` from the [latest release](https://github.com/DivaSatriaa/Clipdeck/releases/latest), open it on the phone and install it. Android asks you to allow installs from that source once.
+
+   Prefer to build it yourself? You need the Android SDK (or open the `android/` folder in Android Studio):
 
    ```bash
    make android
    ```
 
-   The APK is written to `android/app/build/outputs/apk/release/app-release.apk`. Copy it to the phone and open it to install. Android asks you to allow installs from that source once.
+   The APK is written to `android/app/build/outputs/apk/release/app-release.apk`.
 
 2. **Pair the phone with the computer** in the computer's *Settings → Bluetooth*. Pairing is needed only once.
 3. **On the computer**, open the Clipdeck app and turn on **Send copies to my phone**.
