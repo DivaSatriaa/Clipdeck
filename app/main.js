@@ -19,6 +19,7 @@ const UUID = 'clipdeck@divasatriaa.github.io';
 const SCHEMA_ID = 'org.gnome.shell.extensions.clipdeck';
 const REPO_URL = 'https://github.com/divasatriaa/clipdeck';
 const ISSUES_URL = `${REPO_URL}/issues`;
+const COFFEE_URL = 'https://ko-fi.com/divasatria';
 
 const APP_DIR = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
 
@@ -484,6 +485,16 @@ class ClipdeckWindow extends Adw.ApplicationWindow {
         star.connect('activated', () => this.application.activate_action('star', null));
         group.add(star);
 
+        const coffee = new Adw.ActionRow({
+            title: 'Buy me a coffee',
+            subtitle: 'Clipdeck is free. Support its development on Ko-fi',
+            activatable: true,
+        });
+        coffee.add_prefix(new Gtk.Image({icon_name: 'emblem-favorite-symbolic'}));
+        coffee.add_suffix(new Gtk.Image({icon_name: 'adw-external-link-symbolic'}));
+        coffee.connect('activated', () => this.application.activate_action('coffee', null));
+        group.add(coffee);
+
         const issues = new Adw.ActionRow({
             title: 'Report an issue',
             subtitle: 'Found a bug or have an idea?',
@@ -614,6 +625,7 @@ class ClipdeckApplication extends Adw.Application {
 
         this._addAction('star', () => this._openUri(REPO_URL));
         this._addAction('issues', () => this._openUri(ISSUES_URL));
+        this._addAction('coffee', () => this._openUri(COFFEE_URL));
         this._addAction('about', () => this._showAbout());
         this._addAction('quit', () => this.quit());
         this.set_accels_for_action('app.quit', ['<Control>q']);

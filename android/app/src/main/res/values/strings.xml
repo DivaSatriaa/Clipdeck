@@ -37,4 +37,5 @@
     <string name="notification_connecting">Connecting…</string>
     <string name="notification_connected">Connected to %1$s</string>
     <string name="notification_retrying">Waiting for the computer…</string>
+    <string name="action_coffee">☕ Buy me a coffee</string>
 </resources>

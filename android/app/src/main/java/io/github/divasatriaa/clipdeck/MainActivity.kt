@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
+import android.net.Uri
 import android.provider.Settings
 import android.text.format.DateUtils
 import android.util.Size
@@ -210,8 +211,20 @@ fun ClipdeckScreen() {
                 }
             }
             items(items, key = { it.id }) { ItemCard(it) }
+            item { CoffeeButton() }
         }
     }
+}
+
+@Composable
+private fun CoffeeButton() {
+    val context = LocalContext.current
+    OutlinedButton(
+        onClick = {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/divasatria")))
+        },
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+    ) { Text(stringResource(R.string.action_coffee)) }
 }
 
 @Composable
